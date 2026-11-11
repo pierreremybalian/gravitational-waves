@@ -1,0 +1,31 @@
+---
+id: finding
+title: 'Finding it'
+kicker: 'Measured · whitening and the matched filter'
+summary: 'Two steps pull the chirp out. Divide each frequency by its own noise, so no part of the spectrum drowns the rest. Then compare the data with what general relativity predicts, at every possible moment.'
+beats:
+  - local: 0.14
+    text: 'Whitening: each frequency is divided by the noise curve. The wall and the valley flatten; what is left is noise that is equally loud everywhere. You are hearing the whitened Hanford data.'
+  - local: 0.32
+    text: 'Band-pass: keep 35–350 Hz, where the detector is quietest and the chirp lives. Something now stands up in the last fifth of a second, rising in frequency as it comes toward you. The chirp. The bright line rides the moment you hear.'
+  - local: 0.52
+    text: 'The same whitened data as a trace. The burst near the end is visible now, but noise makes bursts too. How sure can anyone be?'
+  - local: 0.62
+    text: 'The matched filter. The white curve is a template: the waveform general relativity predicts for two black holes of these masses, whitened the same way. It slides along the data; at each offset the two are multiplied and summed.'
+  - local: 0.76
+    text: 'The pen draws how well they match at each offset, as a signal-to-noise ratio. Away from the event, noise matches by chance: 2, 3, 4.'
+  - local: 0.9
+    text: 'At zero offset the template locks onto the data. Signal-to-noise 23.85 across both detectors (19.5 at Hanford, 13.7 at Livingston). Noise alone would do this less than once in 200,000 years.'
+howWeKnow: 'Whitening, band-pass and matched filtering follow GWOSC’s GW150914 tutorial: the template is the best-fit waveform it publishes (SEOBNRv2, detector-frame masses 41.7 and 29.2 suns), complex-filtered against the whitened data with the noise spectrum as weight, over 20–1800 Hz. The network value combines Hanford and Livingston, with Livingston shifted by the 7.09 ms between them. The discovery paper’s searches report 24 and a false-alarm rate below one in 203,000 years; our curve is computed with the one best-fit template rather than a bank of a quarter of a million, so it shows the lock, not the search. The landscape’s whitened terrain is also divided by each frequency’s median power over the window, because the 32-second noise curve does not flatten three seconds perfectly.'
+sources:
+  - label: 'GWOSC: Binary black hole signals in LIGO open data (tutorial)'
+    url: 'https://gwosc.org/tutorials/'
+  - label: 'Abbott et al. 2016, GW150914: First results from the search for binary black hole coalescence with Advanced LIGO, PRD 93, 122003'
+    url: 'https://doi.org/10.1103/PhysRevD.93.122003'
+  - label: 'Usman et al. 2016, The PyCBC search for gravitational waves from compact binary coalescence, CQG 33, 215004'
+    url: 'https://doi.org/10.1088/0264-9381/33/21/215004'
+---
+
+A matched filter works because a chirp is not a random burst: it has a precise shape, set by the masses and spins of the two bodies, and that shape is calculable in advance. Multiplying the data by the expected shape and adding everything up makes the parts that match add together, while noise, which does not know the shape, mostly cancels itself out.
+
+The real searches do not know the masses beforehand. They run the data through a bank of hundreds of thousands of templates covering every plausible pair, and keep the best match. GW150914 was found within three minutes of reaching the detectors by an unmodelled burst search, then confirmed by two template searches.

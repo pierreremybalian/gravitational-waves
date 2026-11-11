@@ -104,8 +104,8 @@ export default function catalogueScene(): BlockScene {
   const LSEL = labels.index('sel');
   const LHOV = labels.index('hover');
   const LS = [0, 1, 2, 3, 4].map((k) => labels.index(`s${k}`));
-  let yearU: number[] = [];
-  let candU = 0;
+  let yearXZ: ([number, number] | null)[] = [];
+  let candXZ: [number, number] = [0, 0];
 
   /** Camera centred in the free rect (the panel takes the rest). */
   function frame() {
@@ -248,9 +248,12 @@ export default function catalogueScene(): BlockScene {
       // Year marks along the spiral.
       const g0 = events[0]!.gps;
       const g1 = events[events.length - 1]!.gps;
-      yearU = YEARS.map((y) => (gpsOfYear(y) - g0) / (g1 - g0));
+      yearXZ = YEARS.map((y) => {
+        const u = (gpsOfYear(y) - g0) / (g1 - g0);
+        return u < 0 || u > 1 ? null : spiralAt(u);
+      });
       const firstCand = events.findIndex((e) => e.type === null);
-      candU = firstCand >= 0 ? placed[firstCand]!.u : 1;
+      candXZ = spiralAt(Math.min(1, (firstCand >= 0 ? placed[firstCand]!.u : 1) + 0.02));
       bridge.pick = (fx, fy) => {
         let best = -1;
         let bd = 0.03 * 0.03;
@@ -443,7 +446,7 @@ export default function catalogueScene(): BlockScene {
         }
         heads.commit();
       } else {
-        for (const l of LS) labels.hide(l);
+        for (let k = 0; k < LS.length; k++) labels.hide(LS[k]!);
       }
 
       // ── Labels ──
@@ -451,22 +454,19 @@ export default function catalogueScene(): BlockScene {
       const R = SPIRAL_R1 + 0.35;
       // Mass marks on the near side of their rings (time view) or at the left of the lines (distance view).
       const camAz = Math.atan2(camera.position.x - tgt.x, camera.position.z - tgt.z) + 0.55;
-      MASS_MARKS.forEach((m, k) => {
-        const y = massY(m);
-        const xt = Math.sin(camAz) * R;
-        const zt = Math.cos(camAz) * R;
-        const xd = DIST_WIDTH / 2 + 0.05;
-        labels.place(LM[k]!, xt + (xd - xt) * mv, y, zt + (-1.5 - zt) * mv, camera, ax * 0.9);
-      });
-      DIST_MARKS.forEach((d, k) => labels.place(LD[k]!, distX(d), FLOOR, -1.5, camera, ax * mv));
-      YEARS.forEach((y, k) => {
-        const u = yearU[k]!;
-        if (u < 0 || u > 1) return labels.hide(LY[k]!);
-        const [x, z] = spiralAt(u);
-        labels.place(LY[k]!, x, FLOOR - 0.12, z, camera, ax * (1 - mv) * 0.8);
-      });
-      labels.place(LNS, Math.sin(camAz) * R, massY(3), Math.cos(camAz) * R, camera, 0);
-      const [cx, cz] = spiralAt(Math.min(1, candU + 0.02));
+      const xt = Math.sin(camAz) * R;
+      const zt = Math.cos(camAz) * R;
+      const xd = DIST_WIDTH / 2 + 0.05;
+      for (let k = 0; k < MASS_MARKS.length; k++) labels.place(LM[k]!, xt + (xd - xt) * mv, massY(MASS_MARKS[k]!), zt + (-1.5 - zt) * mv, camera, ax * 0.9);
+      for (let k = 0; k < DIST_MARKS.length; k++) labels.place(LD[k]!, distX(DIST_MARKS[k]!), FLOOR, -1.5, camera, ax * mv);
+      for (let k = 0; k < YEARS.length; k++) {
+        const y = yearXZ[k]!;
+        if (!y) labels.hide(LY[k]!);
+        else labels.place(LY[k]!, y[0], FLOOR - 0.12, y[1], camera, ax * (1 - mv) * 0.8);
+      }
+      labels.place(LNS, xt, massY(3), zt, camera, 0);
+      const cx = candXZ[0];
+      const cz = candXZ[1];
       labels.place(LC, cx + (DIST_WIDTH / 2 + 0.7 - cx) * mv, FLOOR - 0.1, cz + (-1.3 - cz) * mv, camera, ax * (fl.candidate ? 0.85 : 0) * (tool ? 1 : 0));
       if (sel >= 0) {
         pos(sel, v, placed[sel]!.hasMass ? 'f' : '1');

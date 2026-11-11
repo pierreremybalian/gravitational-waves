@@ -48,9 +48,14 @@ const params = {
     [1, 8.8],
   ]),
   tt: track([
-    [0, 0.9],
-    [0.44, 0.85],
-    [0.6, 0.55],
+    [0, 0.55],
+    [0.44, 0.55],
+    [0.6, 0.15],
+  ]),
+  tx: track([
+    [0, 0],
+    [0.44, 0],
+    [0.6, -0.9],
   ]),
   ty: track([
     [0, 2.9],
@@ -89,6 +94,12 @@ export default function noiseScene(): BlockScene {
   const L = { raw: ix('raw'), sig: ix('sig'), seis: ix('seis'), therm: ix('therm'), shot: ix('shot'), mains: ix('mains'), violin: ix('violin'), quiet: ix('quiet'), f: ix('f'), t: ix('t') };
   const zoomText = `The signal ×${Math.round(SIGNAL_ZOOM)}`;
   let zoomShown = false;
+
+  /** A label on the ASD ridge at frequency f, value a (raised by lift). */
+  function atWall(f: number, a: number, i: number, lift: number, o: number) {
+    v.set(land.xOf(f), land.heightOfAsd(a) * params.height + lift, nf.wallZ);
+    labels.place(i, v.x, v.y, v.z, rig.camera, o);
+  }
 
   const self: BlockScene = {
     id: 'noise',
@@ -159,7 +170,7 @@ export default function noiseScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local) * (portrait ? 1.1 : 1);
-      pose.tx = 0;
+      pose.tx = params.tx(local) * (portrait ? 0 : 1);
       pose.tt = params.tt(local);
       pose.ty = params.ty(local);
       rig.apply(pose, reduced ? 0 : elapsed);
@@ -175,15 +186,11 @@ export default function noiseScene(): BlockScene {
       const nm = NOISE.names(local);
       const H = params.height;
       const wz = nf.wallZ;
-      const at = (f: number, a: number, i: number, lift = 0.08) => {
-        v.set(land.xOf(f), land.heightOfAsd(a) * H + lift, wz);
-        labels.place(i, v.x, v.y, v.z, rig.camera, nm);
-      };
-      at(19, stats.asd.at15 * 0.12, L.seis, 0.12);
-      at(48, stats.asd.at100 * 2.2, L.therm, 0.12);
-      at(780, stats.asd.at1000, L.shot, 0.12);
-      at(stats.asd.mainsFreq, stats.asd.mainsValue, L.mains, 0.0);
-      at(stats.asd.violinFreq, stats.asd.violinValue, L.violin, 0.0);
+      atWall(19, stats.asd.at15 * 0.12, L.seis, 0.12, nm);
+      atWall(48, stats.asd.at100 * 2.2, L.therm, 0.12, nm);
+      atWall(780, stats.asd.at1000, L.shot, 0.12, nm);
+      atWall(stats.asd.mainsFreq, stats.asd.mainsValue, L.mains, 0.0, nm);
+      atWall(stats.asd.violinFreq, stats.asd.violinValue, L.violin, 0.0, nm);
       v.set(land.xOf(stats.asd.minFreq), land.heightOfAsd(stats.asd.minValue) * H, wz);
       labels.place(L.quiet, v.x, v.y - 0.05, v.z, rig.camera, nm);
       labels.place(L.f, land.x[land.cols - 1]! + 0.1, 0, land.z[land.rows - 1]! + 0.1, rig.camera, NOISE.wall(local) * 0.9);

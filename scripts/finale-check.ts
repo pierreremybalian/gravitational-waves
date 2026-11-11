@@ -101,7 +101,7 @@ function checkCard(f: Record<string, string>, ev: CatalogEvent) {
     checkCard(await facts(page), ev);
     const det = ['H1', 'L1', 'V1', 'K1', 'G1'].find((d) => ev.snippet?.detectors.includes(d));
     if (det) ok(await waitClip(page, `event:${name}:${det}`), `${name}: ${det} data plays on the transport`);
-    const modelHidden = await page.evaluate(() => (document.querySelector('[data-play-model]') as HTMLElement).hidden);
+    const modelHidden = (await page.evaluate(() => (document.querySelector("[data-play-model]") as HTMLElement).hidden)) as boolean;
     if (ev.m1 !== null) {
       ok(!modelHidden, `${name}: model chirp offered`);
       await page.click('[data-play-model]');

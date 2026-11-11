@@ -21,6 +21,8 @@ import { track } from '../../time/tracks.ts';
 import { bump } from '../../shared/math.ts';
 import { BASELINE_KM, DET as STEPS, DT, LIGHT, RING_COS } from '../../script/detectors.ts';
 
+const SITES = ['H1', 'L1', 'V1', 'K1'] as const;
+
 const params = {
   fov: 30,
   /** Camera: the point under it (degrees) and distance (globe radii from the centre). */
@@ -178,7 +180,7 @@ export default function detectorsScene(): BlockScene {
       const drift = reduced ? 0 : Math.sin(elapsed * 0.05) * 1.5;
       latLonToScene(params.lat(local), params.lon(local) + drift, v, 1);
       const portrait = aspect < 1;
-      const dist = params.dist(local) * (portrait ? 1.35 : 1);
+      const dist = params.dist(local) * (portrait ? 1.75 : 1);
       camera.position.copy(v).multiplyScalar(dist);
       camera.up.set(0, 1, 0);
       camera.lookAt(0, 0, 0);
@@ -220,7 +222,8 @@ export default function detectorsScene(): BlockScene {
       heads.commit();
 
       // ── Labels ──
-      for (const id of ['H1', 'L1', 'V1', 'K1'] as const) {
+      for (let si = 0; si < SITES.length; si++) {
+        const id = SITES[si]!;
         g.sitePosition(id, v).normalize();
         w.copy(camera.position).normalize();
         const facing = v.dot(w) > 0.15 ? 1 : 0;

@@ -37,6 +37,7 @@ How to build a stage scene for Gravitational Waves. Read `HANDOFF.md` (story, fi
 | `gfx/rig.ts` | `OrbitRig` camera with idle drift. |
 | `gfx/palette.ts` | `PAL`, `DET` / `detColour(id)`: detector colours (H1 amber, L1 cyan, V1 violet, K1 lime); CSS `--color-h1` … `--color-k1`. |
 | `gwdata.ts` | Data loaders (above). |
+| `detector/` | Stages 8–13 kit: `createInterferometer`, `createDetectorGlobe` (+ `latLonToScene`, `armDirection`), `buildLandscape` + `createNoiseField` (ridges), `createBeads` (per-bead colour, size, hollow ring), `spectro.ts` (fft, whiten, spectrogram), `trace.ts` (`tracePoints`, `sampleSeries`, `LabelTable` for allocation-free live labels). |
 
 ## Look
 

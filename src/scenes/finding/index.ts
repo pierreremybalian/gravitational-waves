@@ -51,9 +51,9 @@ const params = {
     [0.56, 7.4],
   ]),
   tt: track([
-    [0, 0.55],
-    [0.44, 0.35],
-    [0.56, -0.15],
+    [0, 0.15],
+    [0.44, 0.15],
+    [0.56, -0.45],
   ]),
   ty: track([
     [0, 0.2],
@@ -61,8 +61,8 @@ const params = {
     [0.56, 3.4],
   ]),
   tx: track([
-    [0, 0],
-    [0.44, 0],
+    [0, -0.9],
+    [0.44, -0.9],
     [0.56, -0.6],
   ]),
 };
@@ -95,6 +95,15 @@ export default function findingScene(): BlockScene {
   const L = { lo: ix('lo'), hi: ix('hi'), chirp: ix('chirp'), data: ix('data'), tmpl: ix('tmpl'), snr: ix('snr'), pen: ix('pen') };
   const snrText = new LabelTable(0, 25, 2500, (x) => `SNR ${x.toFixed(2)}`);
   const span = params.tTo - params.tFrom;
+
+  function place(i: number, x: number, y: number, sx: number, sy: number) {
+    const s = tape.state[i]!;
+    s.x = x;
+    s.y = y;
+    s.z = params.tapeZ;
+    s.sx = sx;
+    s.sy = sy;
+  }
 
   const self: BlockScene = {
     id: 'finding',
@@ -164,14 +173,6 @@ export default function findingScene(): BlockScene {
       const flash = windowed(local, 0.87, 0.95, 0.01, 0.06);
       const pen = FIND.pen(local);
       const S = tape.state;
-      const place = (i: number, x: number, y: number, sx: number, sy: number) => {
-        const s = S[i]!;
-        s.x = x;
-        s.y = y;
-        s.z = params.tapeZ;
-        s.sx = sx;
-        s.sy = sy;
-      };
       place(0, params.mergerX, params.tapeY, params.tsx, params.gain);
       S[0]!.intensity = tp;
       place(1, params.mergerX + params.tsx * off, params.tapeY, params.tsx, params.gain);
@@ -197,7 +198,7 @@ export default function findingScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local) * (portrait ? 1.12 : 1);
-      pose.tx = params.tx(local) * (portrait ? 0 : 1);
+      pose.tx = portrait ? (local > 0.5 ? 0.9 : 0) : params.tx(local);
       pose.tt = params.tt(local);
       pose.ty = params.ty(local);
       rig.apply(pose, reduced ? 0 : elapsed);

@@ -1,0 +1,33 @@
+---
+id: noise
+title: 'Noise'
+kicker: 'Measured · what Hanford actually recorded'
+summary: 'The detector’s raw output does not look like a chirp. It wobbles hundreds of times more than the signal, mostly with the slow shaking of the ground. What you hear is that raw recording.'
+beats:
+  - local: 0.1
+    text: 'Three seconds of raw strain from Hanford around the event: a slow, heavy swaying. Played as sound it is a rumble, mostly below what ears and speakers reach.'
+  - local: 0.24
+    text: 'The white line is the signal, the best-fit chirp, drawn on the same scale. It is flat. The raw wobble is about 2.5 × 10⁻¹⁹ (rms); the signal peaks at 1.1 × 10⁻²¹, about 240 times smaller.'
+  - local: 0.38
+    text: 'Magnified 310 times, the signal shows its shape: the chirp, hidden inside the wobble the whole time.'
+  - local: 0.56
+    text: 'The same seconds as a landscape: time runs toward you, frequency across, and height is how strongly the detector moved at each frequency, moment by moment.'
+  - local: 0.7
+    text: 'Along the back, the bright ridge is the noise curve (the amplitude spectral density) over the full 32 seconds. The lower it is, the quieter the detector at that frequency.'
+  - local: 0.8
+    text: 'On the left, a wall: ground motion and the controls that fight it, hundreds of times higher than the floor at 15 Hz. In the middle, the quietest valley, about 7 × 10⁻²⁴ per root hertz near 160 Hz. On the right it climbs again: quantum noise, the graininess of the laser light itself.'
+  - local: 0.9
+    text: 'The spikes are instrument lines: the 60 Hz mains and its harmonics, and near 500 Hz the violin modes of the fibres the mirrors hang from. The chirp is somewhere in this terrain. It is invisible.'
+howWeKnow: 'The raw strain is GWOSC’s 4096-per-second Hanford record (32 s around the event). The noise curve is our Welch estimate over those 32 seconds (4 s Hann windows, median average); its minimum and the line frequencies are read from it. The landscape is built in your browser: the raw strain is divided by the noise curve in the frequency domain (whitened, 15–1000 Hz), cut into 62.5 ms windows, and the noise curve multiplied back in, which is the raw data’s own short-time spectrum without the leakage that the enormous low-frequency motion would otherwise smear across it. Which noise dominates where (seismic and control noise at low frequency, thermal noise in the middle, shot noise above a few hundred hertz) follows the Advanced LIGO sensitivity study by Martynov et al.'
+sources:
+  - label: 'Martynov et al. 2016, Sensitivity of the Advanced LIGO detectors at the beginning of gravitational wave astronomy, PRD 93, 112004'
+    url: 'https://doi.org/10.1103/PhysRevD.93.112004'
+  - label: 'LIGO and Virgo 2020, A guide to LIGO–Virgo detector noise and extraction of transient gravitational-wave signals, CQG 37, 055002'
+    url: 'https://doi.org/10.1088/1361-6382/ab685e'
+  - label: 'GWOSC: GW150914 event data'
+    url: 'https://gwosc.org/eventapi/html/GWTC-1-confident/GW150914/v3/'
+---
+
+Everything shakes the mirrors. The ground moves by about a micrometre at a few hertz, hundreds of billions of times more than the arm change of the signal; several stages of active and passive isolation take most of that out, and what is left still dominates below 20 hertz. Atoms in the mirror coatings and their suspension fibres jiggle with heat. And light arrives in photons, at random moments, so the measured brightness flickers by itself: shot noise, the quantum floor at high frequencies.
+
+None of this can be removed completely. What makes detection possible is that the noise is understood: its spectrum is measured continuously, and the signal has a shape that the noise does not.

@@ -1,0 +1,35 @@
+---
+id: detectors
+title: 'Two detectors'
+kicker: 'Measured · Hanford and Livingston, 7.09 ms apart'
+summary: 'One detector cannot tell a signal from a glitch. Two, far apart, must see the same wave, at times no further apart than light could travel between them.'
+beats:
+  - local: 0.1
+    text: 'LIGO Hanford, Washington, and LIGO Livingston, Louisiana. Their arms (drawn hundreds of kilometres long) point where they were surveyed. Virgo in Italy and KAGRA in Japan joined later.'
+  - local: 0.24
+    text: 'Straight through the Earth they are 3,002 km apart. Light, and a gravitational wave, takes 10.01 milliseconds to cross that. No real signal can arrive further apart.'
+  - local: 0.36
+    text: 'The wavefront, slowed to the pace of your scroll. It reached Livingston first; Hanford 7.09 milliseconds later. You are hearing Livingston.'
+  - local: 0.58
+    text: '7.09 of a possible 10.01 milliseconds puts the source on a ring of the sky: every direction about 45 degrees from the line joining the two sites gives the same delay.'
+  - local: 0.66
+    text: 'The rest comes from how strongly each detector responded. The published sky map lies along part of this ring, mostly in the southern sky, about 600 square degrees: two detectors cannot do better.'
+  - local: 0.8
+    text: 'The two recordings. Shift Livingston’s by 7.09 milliseconds and it lines up with Hanford’s.'
+  - local: 0.92
+    text: 'And turn it upside down. The two L’s are set at angles that, with the Earth’s curvature between them, make one read the opposite sign of the other. Now you are hearing Hanford: the same chirp.'
+howWeKnow: 'Site positions and arm directions are the surveyed vertex coordinates and azimuths tabulated in LALSuite; the light travel time follows from the straight-line distance. The 7.09 ms offset and the sign are measured from our matched filter of the two whitened recordings (cross-correlating the data directly gives 7.28 ms; the discovery paper quotes about 7 ms). The ring is the cone cos θ = 7.09/10.01 about the Hanford–Livingston axis. The highlighted arc is the ring’s southern part, where the published localisation lies; the wavefront is drawn from the ring’s southernmost direction, a choice for the picture. Coastlines: Natural Earth, public domain.'
+sources:
+  - label: 'Abbott et al. 2016, Localization and broadband follow-up of GW150914, ApJL 826, L13'
+    url: 'https://doi.org/10.3847/2041-8205/826/1/L13'
+  - label: 'LALSuite: detector constants (LALDetectors.h)'
+    url: 'https://lscsoft.docs.ligo.org/lalsuite/lal/group___l_a_l_detectors__h.html'
+  - label: 'Abbott et al. 2016, Observation of Gravitational Waves from a Binary Black Hole Merger, PRL 116, 061102'
+    url: 'https://doi.org/10.1103/PhysRevLett.116.061102'
+  - label: 'Natural Earth: coastlines (public domain)'
+    url: 'https://www.naturalearthdata.com/'
+---
+
+Two detectors are the minimum for a claim. A truck, a lightning strike or a glitch in the electronics can shake one site; nothing local shakes both within ten milliseconds with the same waveform. In the months around GW150914 the collaboration measured how often that happens by chance by sliding one detector’s data against the other’s by more than the light-travel time, millions of times: never as loud as this.
+
+The timing also points. With two sites the source is somewhere on a ring; with three (Virgo joined in August 2017) the rings cross, and the sky area shrinks from hundreds of square degrees to tens. That is what let telescopes find the kilonova of GW170817 within eleven hours.

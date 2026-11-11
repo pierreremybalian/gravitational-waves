@@ -64,3 +64,15 @@ Chirp audio (16384 Hz, 16-bit WAV, 2.000 s, t ∈ [−1.5, +0.5] s, 80 ms fades,
 - Stages 4–6 play the best-fit model slowed with its pitch kept, built in the browser from the template's frequency/phase/amplitude tracks: 4 = −1.5…−0.6 s ×10 slower, pitch ×8; 5 = −0.6…+0.03 s ×12, pitch ×4; 6 = −35…+30 ms ×60, pitch ×4. Clips are registered on the transport at their slow rate, so `ctx.chirp.t` is data time and orbit, waves and sound share one clock. Stated in each stage note.
 - Stage 4 draws the outgoing waves at a quarter of light speed so the spiral fits the view (stated).
 - Masses are source-frame from events.json (34.6 + 30.0 → 61.5 M☉, 3.1 M☉ radiated); stage 1/5 readouts that quote detector-frame values say so.
+
+## 2026-11-10 — Stages 8–13 and the catalogue finale
+
+- Kit `src/shared/detector/`: `interferometer.ts`, `globe.ts` (Natural Earth 110m coastlines, public domain, copied to `public/data/geo/`), `ridges.ts` + `landscape.ts` + `noisefield.ts` (noise landscape), `beads.ts`, `spectro.ts` (FFT, whitening, short-time spectra; tested), `trace.ts`, `stats.ts`, `clips.ts`.
+- Numbers quoted by the pure stage scripts come from `src/data/detector-stats.json` and `src/data/results.json`, written by `node scripts/detector-stats.ts` from `public/data`; a test fails if they go stale.
+- Stage 8: the arms are driven by the best-fit template at Hanford on the clip `chirp-template`; mirror motion ×8.3 × 10¹⁹, swing slowed 12× (phase ÷ 12) because 35–250 Hz cannot be drawn at 60 fps; both stated.
+- Stage 9 plays the raw Hanford strain as a clip (`raw-H1`, defined at run time from `raw-H1.f32`, t0 −1.5 s, nothing filtered): mostly below hearing, which is the point.
+- Noise landscape: the raw terrain is ASD(f)·|W(t,f)| (whitened short-time spectrum with the ASD multiplied back), not a direct STFT of the raw strain, which leaks the <10 Hz motion everywhere. The whitened terrain is also divided by each frequency's median power over the 3 s (the 32 s ASD does not flatten 3 s exactly).
+- Stage 10's SNR pen reads `snr-net` at the template's offset (one best-fit template, not a bank); locks at 23.85.
+- Stage 11: the sky ring is cos θ = 7.09/10.01 about the H1→L1 axis; the highlighted arc is its part below −14.5° declination (where the published map lies); the wavefront comes from the ring's southernmost point, a drawing choice.
+- Stage 12 shows the catalogue values (GWTC-2.1: 34.6 + 30.0 → 61.5, 470 Mpc) beside the 2016 PRL values (36 + 29 → 62, 410 Mpc); the HANDOFF numbers are the latter.
+- Finale: `src/finale/` (layout, state, model chirp, UI). Model chirp = Newtonian inspiral to ISCO + Berti et al. ringdown at spin 0.69 (none for BNS), labelled modelled. Selecting an event autoplays its first detector's data; the status chip switches to modelled while the model plays. `<Finale />` added to `src/pages/index.astro`. `node scripts/finale-check.ts` checks card values against events.json, playback, keyboard, filters, phone layout.

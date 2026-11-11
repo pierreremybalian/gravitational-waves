@@ -137,7 +137,8 @@
     position: absolute;
     pointer-events: auto;
     right: max(0.75rem, env(safe-area-inset-right));
-    top: 1rem;
+    /* Below the HUD's stage line and readouts (published by the narration as --hud-top). */
+    top: calc(var(--hud-top, 6rem) + 0.6rem);
     bottom: 5.4rem;
     width: min(22rem, calc(100vw - 1.5rem));
     display: flex;

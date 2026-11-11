@@ -56,16 +56,16 @@ const params = {
   ty: track([
     [0, -1.5],
     [0.43, -1.3],
-    [0.5, 0.62],
-    [0.63, 0.62],
+    [0.5, 1.0],
+    [0.63, 1.0],
     [0.71, -1.3],
   ]),
   tt: track([
-    [0, 0],
-    [0.43, 0],
-    [0.5, 0.2],
-    [0.63, 0.2],
-    [0.71, 0],
+    [0, -0.3],
+    [0.43, -0.3],
+    [0.5, 0.05],
+    [0.63, 0.05],
+    [0.71, -0.3],
   ]),
 };
 
@@ -154,7 +154,7 @@ export default function interferometerScene(): BlockScene {
       const portrait = rig.camera.aspect < 1;
       pose.az = params.az(local);
       pose.el = params.el(local);
-      pose.dist = params.dist(local) * (portrait ? 1.05 : 1);
+      pose.dist = params.dist(local) * (portrait ? 1.55 : 1);
       pose.tx = params.tx(local);
       pose.tt = params.tt(local);
       pose.ty = params.ty(local);

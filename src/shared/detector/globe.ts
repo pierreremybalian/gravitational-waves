@@ -251,10 +251,11 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
       q.setFromUnitVectors(zAxis, front.n);
       frontGroup.quaternion.copy(q);
       frontGroup.position.copy(front.n).multiplyScalar(front.s);
-      sites.forEach((id, i) => {
+      for (let i = 0; i < sites.length; i++) {
+        const id = sites[i]!;
         pos(id, v).normalize().multiplyScalar(1.006);
         beads.set(i, v.x, v.y, v.z, 0.022, show.sites * site[id]);
-      });
+      }
       beads.commit();
     },
     dispose() {

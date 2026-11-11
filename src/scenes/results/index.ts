@@ -243,7 +243,7 @@ export default function resultsScene(): BlockScene {
       const portrait = rig.camera.aspect < 1;
       pose.az = params.az(local);
       pose.el = params.el(local);
-      pose.dist = params.dist(local) * (portrait ? 1.25 : 1);
+      pose.dist = params.dist(local) * (portrait ? 1.6 : 1);
       pose.tx = params.tx(local);
       pose.tt = params.tt(local);
       pose.ty = 0;
