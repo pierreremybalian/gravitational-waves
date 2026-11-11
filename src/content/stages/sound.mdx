@@ -1,0 +1,27 @@
+---
+id: sound
+title: 'A sound from space'
+kicker: 'Measured · 14 September 2015, 09:50:45 UTC'
+summary: 'This is two black holes colliding, 1.3 billion years ago. Two detectors 3,000 km apart recorded it as a tiny tremor in the length of their arms. Played as sound, it is a short rising whoop: a chirp.'
+beats:
+  - local: 0.12
+    text: 'The amber trace is Hanford, Washington; the cyan one is Livingston, Louisiana. Both have been whitened and filtered to the 35–350 Hz band where the detectors listen best. The bright point is what you are hearing now.'
+  - local: 0.3
+    text: 'Most of the two seconds is noise. The event is the last fifth of a second: the wiggles grow faster and taller, then stop. Faster means higher pitch, taller means louder.'
+  - local: 0.5
+    text: 'Now Livingston. It heard the same chirp 7 milliseconds earlier. The white line over Hanford’s trace is the best-fit prediction of general relativity for two black holes of about 35 and 30 suns.'
+  - local: 0.75
+    text: 'On small speakers the chirp is hard to hear: it peaks around 150 Hz, near the bottom of what a laptop plays. Here it is two octaves higher, with exactly the same timing.'
+howWeKnow: 'These are the detectors’ own strain recordings, published by the Gravitational Wave Open Science Center (32 seconds at 4096 samples per second from each site). We estimate each detector’s noise spectrum from those 32 seconds, divide it out (whitening), band-pass 35–350 Hz and play two seconds around the merger at the real sampling rate. Our whitened Hanford trace matches the discovery paper’s Figure 1 to a correlation of 0.96, Livingston to 0.93. The pitch-raised version multiplies every frequency by four and keeps the timing. The model curve is the best-fit waveform from GWOSC’s tutorial, whitened the same way.'
+sources:
+  - label: 'GWOSC: GW150914 event data (GWTC-2.1)'
+    url: 'https://gwosc.org/eventapi/html/GWTC-2.1-confident/GW150914/v4/'
+  - label: 'Abbott et al. 2016, Observation of Gravitational Waves from a Binary Black Hole Merger, PRL 116, 061102'
+    url: 'https://doi.org/10.1103/PhysRevLett.116.061102'
+  - label: 'LIGO Caltech: the GW150914 detection'
+    url: 'https://www.ligo.caltech.edu/detection'
+---
+
+On 14 September 2015 at 09:50:45 UTC, the two Advanced LIGO detectors were in their final engineering run before observing began. Livingston saw a signal first; 7 milliseconds later, Hanford saw the same shape. The automatic search flagged it within three minutes. It took the collaboration five months of checks before announcing, on 11 February 2016, that it was the first direct detection of gravitational waves and the first observation of two black holes merging.
+
+What you hear is not a recording of air. A gravitational wave changes distances, and the detectors measure that change; because the frequencies of this one happen to fall in the range of human hearing, the measurement can be played through a loudspeaker unchanged.
