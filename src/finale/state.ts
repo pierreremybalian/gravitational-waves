@@ -5,6 +5,7 @@
 import { atom } from 'nanostores';
 import type { CatalogEvent } from '../shared/gwdata.ts';
 import type { ModelChirp } from './model.ts';
+import type { Alignment, ProcessedModel } from './overlay.ts';
 import type { View } from './layout.ts';
 
 export type Kind = 'BBH' | 'NSBH' | 'BNS' | 'candidate';
@@ -22,12 +23,27 @@ export interface Selected {
   snippets: Record<string, Float32Array> | null;
   /** Model chirp from the catalogue parameters (null for candidates). */
   model: ModelChirp | null;
+  /** The model whitened and band-passed like the data (src/finale/overlay.ts); what is heard and drawn. */
+  processed: ProcessedModel | null;
+  /** The model laid over one detector's data (Hanford where it has data), once the snippets are in. */
+  overlay: Overlay | null;
 }
+
+export interface Overlay {
+  det: string;
+  align: Alignment;
+  /** The aligned, phase-matched processed model on the data's grid (t0, fs of the snippet), peak 1. */
+  model: Float32Array;
+  t0: number;
+  fs: number;
+}
+
+export type PlayKind = 'data' | 'model' | 'overlay';
 
 export const $selected = atom<Selected | null>(null);
 
 /** What the finale plays now (clip id and what it is), for the scene's strip and the status chip. */
-export const $playing = atom<{ clip: string; name: string; kind: 'data' | 'model'; det: string | null } | null>(null);
+export const $playing = atom<{ clip: string; name: string; kind: PlayKind; det: string | null } | null>(null);
 
 /** The panel's footprint: the part of the viewport left for the 3D view (fractions, top-left origin). */
 export const $free = atom<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 1, h: 1 });
@@ -45,3 +61,5 @@ export const $orbit = atom({ az: 0, el: 0 });
 export const bridge: { pick: ((fx: number, fy: number) => number) | null } = { pick: null };
 
 export const modelClipId = (name: string): string => `model:${name}`;
+
+export const overlayClipId = (name: string): string => `overlay:${name}`;

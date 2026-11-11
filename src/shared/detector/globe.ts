@@ -6,7 +6,8 @@
 //
 // Frame (Earth-fixed): scene (x, y, z) = ECEF (x, z, −y) / R⊕, so the north pole is +y and the globe has radius 1.
 
-import { Group, Quaternion, Vector3 } from 'three/webgpu';
+import { Group, Mesh, MeshBasicNodeMaterial, Quaternion, SphereGeometry, Vector3 } from 'three/webgpu';
+import { dot, float, mix, normalView, positionViewDirection, uniform, vec3 } from 'three/tsl';
 import type { Vec2Uniform } from '../../render/globals.ts';
 import { DETECTORS, type Detector } from '../../gw/units.ts';
 import { createLines, type LineSpec, type Lines } from '../gfx/lines.ts';
@@ -63,14 +64,16 @@ export interface GlobeOptions {
 
 export interface DetectorGlobe {
   group: Group;
-  /** Global multipliers (0 hides). */
-  show: { coast: number; grid: number; sites: number; arms: number; chord: number; ring: number; front: number };
+  /** Global multipliers (0 hides). `body` is the dark fill and rim that make the planet read as solid. */
+  show: { body: number; coast: number; grid: number; sites: number; arms: number; chord: number; ring: number; front: number };
   /** Per-site brightness multipliers (flashes). */
   site: Record<SiteId, number>;
   /** Portion of the sky ring drawn brighter (the band), as fractions of the ring [from, to]; null = none. */
   band: { from: number; to: number; on: number };
   /** Wavefront travel direction is −n (it comes from n); position s along n (globe radii). */
   front: { n: Vector3; s: number };
+  /** Camera position (scene frame): site beads on the far side are hidden. Set before update(). */
+  eye: Vector3;
   sitePosition(id: SiteId, out: Vector3): Vector3;
   /** Point on the sky ring at fraction u (0–1). */
   ringPoint(u: number, out: Vector3): Vector3;
@@ -90,6 +93,17 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
   const sites = o.sites ?? SITE_IDS;
   const group = new Group();
   const v = new Vector3();
+
+  // ── The body: an opaque dark sphere with a faint limb, drawn first so the planet reads as solid ──
+  const bodyOn = uniform(1);
+  const fres = float(1).sub(dot(normalView, positionViewDirection).abs());
+  const bodyMat = new MeshBasicNodeMaterial({ depthWrite: false, depthTest: false });
+  bodyMat.colorNode = mix(vec3(0.003, 0.005, 0.012), vec3(0.07, 0.12, 0.26), fres.pow(4)).mul(bodyOn);
+  const bodyGeo = new SphereGeometry(0.998, 64, 40);
+  const body = new Mesh(bodyGeo, bodyMat);
+  body.renderOrder = -1;
+  group.add(body);
+  const OCC = { centre: [0, 0, 0] as const, radius: 1 };
 
   // ── Surface lines (dimmed behind the globe) ──
   const surf: LineSpec[] = [];
@@ -141,7 +155,7 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
       armSite.push(id);
     }
   }
-  const surface: Lines = createLines(surf, { resolution: o.resolution, occluder: { centre: [0, 0, 0], radius: 1, dim: 0.12 } });
+  const surface: Lines = createLines(surf, { resolution: o.resolution, occluder: { ...OCC, dim: 0.06 } });
   group.add(surface.mesh);
 
   // ── Chord and sky ring (not occluded: the chord runs through the Earth) ──
@@ -177,11 +191,14 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
       pts.set([v.x, v.y, v.z], i * 3);
     }
     free.push({ points: pts, dims: 3, colour: colours.ring, width: 1.3, intensity: 0.4, closed: true });
-    iRing = 1;
+    iRing = 0;
     free.push({ points: pts, dims: 3, colour: [1.0, 0.8, 0.5], width: 4, intensity: 0.8, closed: true });
-    iBand = 2;
+    iBand = 1;
   }
-  const freeLines: Lines | null = free.length ? createLines(free, { resolution: o.resolution }) : null;
+  // Chord: seen through the planet, so dimmed only a little; ring: hidden behind and inside it.
+  const chordLines: Lines | null = free.length ? createLines(free.slice(0, 1), { resolution: o.resolution, occluder: { ...OCC, dim: 0.55 } }) : null;
+  const freeLines: Lines | null = free.length ? createLines(free.slice(1), { resolution: o.resolution, occluder: { ...OCC, dim: 0.08 } }) : null;
+  if (chordLines) group.add(chordLines.mesh);
   if (freeLines) group.add(freeLines.mesh);
 
   // ── Wavefront: a square grid in its own group, oriented along n ──
@@ -194,7 +211,8 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
     frontSpecs.push({ points: Float32Array.from([c, -wf.size / 2, c, wf.size / 2]), colour: colours.front, width: 1.2, intensity: 0.5 * fade });
   }
   const frontGroup = new Group();
-  const frontLines = createLines(frontSpecs, { resolution: o.resolution });
+  // Hidden where it is inside the Earth or behind it, so the plane reads as passing through a solid body.
+  const frontLines = createLines(frontSpecs, { resolution: o.resolution, occluder: { ...OCC, dim: 0.05 } });
   frontGroup.add(frontLines.mesh);
   group.add(frontGroup);
 
@@ -206,10 +224,11 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
   });
   group.add(beads.mesh);
 
-  const show = { coast: 1, grid: 1, sites: 1, arms: 1, chord: 0, ring: 0, front: 0 };
+  const show = { body: 1, coast: 1, grid: 1, sites: 1, arms: 1, chord: 0, ring: 0, front: 0 };
   const site = { H1: 1, L1: 1, V1: 1, K1: 1 } as Record<SiteId, number>;
   const band = { from: 0, to: 0, on: 0 };
   const front = { n: new Vector3(0, 0, 1), s: 3 };
+  const eye = new Vector3(0, 0, 10);
   const q = new Quaternion();
   const zAxis = new Vector3(0, 0, 1);
 
@@ -219,6 +238,7 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
     site,
     band,
     front,
+    eye,
     sitePosition(id, out) {
       return pos(id, out);
     },
@@ -237,8 +257,13 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
         s.intensity = k === 'coast' ? show.coast : k === 'grid' ? show.grid : show.arms * site[armSite[i]!]!;
       }
       surface.commit();
+      bodyOn.value = show.body;
+      body.visible = show.body > 0.001;
+      if (chordLines) {
+        chordLines.state[iChord]!.intensity = show.chord;
+        chordLines.commit();
+      }
       if (freeLines) {
-        freeLines.state[iChord]!.intensity = show.chord;
         freeLines.state[iRing]!.intensity = show.ring;
         const bs = freeLines.state[iBand]!;
         bs.intensity = show.ring * band.on;
@@ -253,13 +278,19 @@ export function createDetectorGlobe(o: GlobeOptions): DetectorGlobe {
       frontGroup.position.copy(front.n).multiplyScalar(front.s);
       for (let i = 0; i < sites.length; i++) {
         const id = sites[i]!;
-        pos(id, v).normalize().multiplyScalar(1.006);
-        beads.set(i, v.x, v.y, v.z, 0.022, show.sites * site[id]);
+        pos(id, v).normalize();
+        // Hidden on the far side: the eye is beyond the site's horizon plane.
+        const facing = Math.min(1, Math.max(0, (v.dot(eye) - 1) * 8 + 1));
+        v.multiplyScalar(1.006);
+        beads.set(i, v.x, v.y, v.z, 0.022, show.sites * site[id] * facing);
       }
       beads.commit();
     },
     dispose() {
       surface.dispose();
+      bodyGeo.dispose();
+      bodyMat.dispose();
+      chordLines?.dispose();
       freeLines?.dispose();
       frontLines.dispose();
       beads.dispose();

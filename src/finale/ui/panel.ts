@@ -1,7 +1,8 @@
 // The catalogue finale's HTML side (src/finale/ui/Finale.astro): view and filters, quick picks, search and stepping,
 // the selected event's card (masses with 90% ranges, remnant, radiated, distance, date, detectors, significance) and
-// its sound: the whitened data per detector (measured) or a model chirp from its parameters (modelled), both played
-// on the transport so the scene's strip and binary move with what is heard. Also the pointer and keyboard surface
+// its sound: the model chirp from its parameters (modelled) laid over Hanford's whitened data, aligned to the
+// data's merger (src/finale/overlay.ts; the default), or either alone, all played on the transport so the scene's
+// strip and binary move with what is heard. Also the pointer and keyboard surface
 // over the 3D view, the narration hand-off (readouts and the status chip) and the free area left for the view.
 
 import { $stage } from '../../state/store.ts';
@@ -13,8 +14,9 @@ import type { Readout } from '../../script/index.ts';
 import { eventClipId, loadCatalog, loadSnippet, median, type CatalogEvent, type Interval } from '../../shared/gwdata.ts';
 import { mpcToLy } from '../../gw/units.ts';
 import { modelChirp } from '../model.ts';
+import { alignModel, mixOverlay, processModel, travelTime } from '../overlay.ts';
 import { picks } from '../layout.ts';
-import { $events, $filters, $free, $hover, $orbit, $playing, $selected, $toolOn, $view, bridge, kindOf, modelClipId, type Kind } from '../state.ts';
+import { $events, $filters, $free, $hover, $orbit, $playing, $selected, $toolOn, $view, bridge, kindOf, modelClipId, overlayClipId, type Kind, type Overlay, type PlayKind } from '../state.ts';
 
 const KIND_TEXT: Record<Kind, string> = {
   BBH: 'Two black holes',
@@ -60,6 +62,7 @@ export function initFinale(root: HTMLElement): void {
     dets: q<HTMLElement>('[data-dets]'),
     playData: q<HTMLElement>('[data-play-data]'),
     playModel: q<HTMLButtonElement>('[data-play-model]'),
+    playOverlay: q<HTMLButtonElement>('[data-play-overlay]'),
     stop: q<HTMLButtonElement>('[data-stop]'),
     hint: q<HTMLElement>('[data-sound-hint]'),
     soundOn: q<HTMLButtonElement>('[data-sound-on]'),
@@ -68,6 +71,7 @@ export function initFinale(root: HTMLElement): void {
     sr: q<HTMLElement>('[data-sr]'),
   };
   const docEl = document.documentElement;
+  const debug = new URLSearchParams(location.search).get('audiolog') === '1';
   let events: CatalogEvent[] = [];
   let quick: ReturnType<typeof picks> | null = null;
   const byName = new Map<string, number>();
@@ -135,8 +139,11 @@ export function initFinale(root: HTMLElement): void {
     const m1 = median(ev.m1);
     const m2 = median(ev.m2);
     const model = m1 !== null && m2 !== null ? modelChirp({ m1, m2, mFinal: median(ev.mFinal), redshift: median(ev.redshift), bns: ev.type === 'BNS' }) : null;
-    if (model) transport.defineSamples(modelClipId(ev.name), model.h, model.fs, model.t0);
-    $selected.set({ name: ev.name, index: i, snippets: null, model });
+    // What is heard and drawn is the model processed like the data (whitened, band-passed), on its own clock until
+    // the data are in and it can be aligned to them.
+    const processed = model ? processModel(model, ev.snippet?.fs ?? 2048) : null;
+    if (processed) transport.defineSamples(modelClipId(ev.name), processed.h, processed.fs, processed.t0);
+    $selected.set({ name: ev.name, index: i, snippets: null, model, processed, overlay: null });
     fillCard(ev, model !== null);
     input.value = ev.name;
     // Phones: bring the card into the sheet's view.
@@ -150,21 +157,41 @@ export function initFinale(root: HTMLElement): void {
     if (my !== seq) return;
     const s = ev.snippet;
     if (s) for (const d of Object.keys(snippets)) transport.defineSamples(eventClipId(ev.name, d), snippets[d]!, s.fs, s.t0);
-    $selected.set({ name: ev.name, index: i, snippets, model });
-    fillPlay(ev, snippets);
     const dets = DET_ORDER.filter((d) => snippets[d]);
-    if (autoplay && dets.length) play(ev, 'data', dets[0]!);
+    let overlay: Overlay | null = null;
+    if (processed && s && dets.length) {
+      // Over Hanford where it has data: aligned to its merger with the other detectors as witnesses.
+      const det = dets.includes('H1') ? 'H1' : dets[0]!;
+      const others = dets.filter((d) => d !== det).map((d) => ({ data: snippets[d]!, travel: travelTime(det, d) }));
+      const align = alignModel(snippets[det]!, s.t0, processed, others);
+      const mix = mixOverlay(snippets[det]!, s.t0, s.fs, processed, align);
+      overlay = { det, align, model: mix.model, t0: s.t0, fs: s.fs };
+      // Both clips on the data's grid, so the model alone is heard where it sits in the overlay.
+      transport.defineSamples(overlayClipId(ev.name), mix.mix, s.fs, s.t0);
+      transport.defineSamples(modelClipId(ev.name), mix.model, s.fs, s.t0);
+      if (debug) (window as unknown as { __finaleOverlay?: unknown }).__finaleOverlay = { name: ev.name, det, ...align, t0: s.t0, fs: s.fs, data: snippets[det], model: mix.model, mix: mix.mix, tPeak: processed.tPeak };
+    }
+    $selected.set({ name: ev.name, index: i, snippets, model, processed, overlay });
+    fillPlay(ev, snippets, overlay);
+    if (autoplay && overlay) play(ev, 'overlay', overlay.det);
+    else if (autoplay && dets.length) play(ev, 'data', dets[0]!);
     else publish(ev, null);
   }
 
-  function play(ev: CatalogEvent, kind: 'data' | 'model', det: string | null) {
-    const clip = kind === 'model' ? modelClipId(ev.name) : eventClipId(ev.name, det!);
+  function play(ev: CatalogEvent, kind: PlayKind, det: string | null) {
+    const clip = kind === 'model' ? modelClipId(ev.name) : kind === 'overlay' ? overlayClipId(ev.name) : eventClipId(ev.name, det!);
     transport.play(clip);
     $playing.set({ clip, name: ev.name, kind, det });
     root.querySelectorAll<HTMLButtonElement>('[data-det]').forEach((b) => b.setAttribute('aria-pressed', String(kind === 'data' && b.dataset.det === det)));
     el.playModel.setAttribute('aria-pressed', String(kind === 'model'));
+    el.playOverlay.setAttribute('aria-pressed', String(kind === 'overlay'));
     publish(ev, kind);
-    el.sr.textContent = kind === 'model' ? `Playing a model chirp for ${ev.name} (modelled).` : `Playing ${ev.name}, ${DET_NAME[det!] ?? det} data.`;
+    el.sr.textContent =
+      kind === 'model'
+        ? `Playing a model chirp for ${ev.name} (modelled).`
+        : kind === 'overlay'
+          ? `Playing a model chirp for ${ev.name} (modelled) over ${DET_NAME[det!] ?? det} data.`
+          : `Playing ${ev.name}, ${DET_NAME[det!] ?? det} data.`;
   }
 
   function stop() {
@@ -172,20 +199,22 @@ export function initFinale(root: HTMLElement): void {
     $playing.set(null);
     root.querySelectorAll<HTMLButtonElement>('[data-det]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
     el.playModel.setAttribute('aria-pressed', 'false');
+    el.playOverlay.setAttribute('aria-pressed', 'false');
     const s = $selected.get();
     if (s) publish(events[s.index]!, null);
   }
 
   /** Readouts and the status chip follow what is shown and heard. */
-  function publish(ev: CatalogEvent, kind: 'data' | 'model' | null) {
+  function publish(ev: CatalogEvent, kind: PlayKind | null) {
     const rows: Readout[] = [{ label: 'Event', value: ev.name, tone: 'plain' }];
     const m1 = median(ev.m1);
     const m2 = median(ev.m2);
     if (m1 !== null && m2 !== null) rows.push({ label: 'Masses', value: `${num(m1)} + ${num(m2)} M☉`, tone: 'warm' });
     const d = median(ev.distance);
     if (d !== null) rows.push({ label: 'Distance', value: `${num(d, 0)} Mpc`, tone: 'mute' });
-    if (kind) rows.push({ label: 'Hearing', value: kind === 'model' ? 'model chirp (modelled)' : `${DET_NAME[$playing.get()?.det ?? ''] ?? ''} data`, tone: kind === 'model' ? 'warm' : 'b' });
-    const status = kind === 'model' ? 'modelled' : 'measured';
+    const dn = DET_NAME[$playing.get()?.det ?? ''] ?? '';
+    if (kind) rows.push({ label: 'Hearing', value: kind === 'model' ? 'model chirp (modelled)' : kind === 'overlay' ? `model chirp (modelled) over ${dn} data` : `${dn} data`, tone: kind === 'data' ? 'b' : 'warm' });
+    const status = kind === 'model' || kind === 'overlay' ? 'modelled' : 'measured';
     setCatalogueReadouts(rows, status);
     $statusOverride.set({ ...$statusOverride.get(), catalogue: status });
     refreshNarration();
@@ -215,10 +244,15 @@ export function initFinale(root: HTMLElement): void {
     el.dets.innerHTML = ev.detectors.map((dd) => `<span style="color: var(--color-${dd.toLowerCase()}, var(--color-fog))">${escapeHtml(DET_NAME[dd] ?? dd)}</span>`).join('');
     el.playModel.hidden = !hasModel;
     el.playModel.setAttribute('aria-pressed', 'false');
+    el.playOverlay.hidden = true;
+    el.playOverlay.setAttribute('aria-pressed', 'false');
     el.playData.innerHTML = '';
     const notes: string[] = [];
     if (ev.type === null) notes.push(`Parameters not published yet (${ev.catalog}): only its significance. No model chirp without masses.`);
-    else notes.push('The data are whitened and band-passed (30–350 Hz); for most events the chirp is buried in the noise to the ear. The model chirp is a sketch from the published masses (leading-order inspiral and a ringdown), labelled modelled.');
+    else
+      notes.push(
+        'The data are whitened and band-passed (30–350 Hz); for most events the chirp is buried in the noise to the ear. The model chirp is a sketch from the published masses (leading-order inspiral and a ringdown, put through the same whitening and band), labelled modelled; over the data it is slid to where it best matches them.',
+      );
     if (ev.typeAmbiguous) notes.push('Whether the lighter body is a neutron star is uncertain: its mass range crosses 3 M☉.');
     el.note.textContent = notes.join(' ');
     el.link.href = ev.url;
@@ -226,8 +260,17 @@ export function initFinale(root: HTMLElement): void {
     el.sr.textContent = `${ev.name}: ${KIND_TEXT[k]}.`;
   }
 
-  function fillPlay(ev: CatalogEvent, snippets: Record<string, Float32Array>) {
+  function fillPlay(ev: CatalogEvent, snippets: Record<string, Float32Array>, overlay: Overlay | null) {
     el.playData.innerHTML = '';
+    el.playOverlay.hidden = !overlay;
+    if (overlay) {
+      const a = overlay.align;
+      const name = DET_NAME[overlay.det] ?? overlay.det;
+      el.playOverlay.innerHTML = `Model over ${escapeHtml(name)} data <span>modelled</span>`;
+      el.playOverlay.title = a.fallback
+        ? `No clear match in the data: the model's merger is put at the catalogue time.`
+        : `Model's merger placed at ${(a.offset * 1000).toFixed(1)} ms from the catalogue time (best match, SNR ${a.snr.toFixed(1)} in ${name}).`;
+    }
     const dets = DET_ORDER.filter((d) => snippets[d]);
     if (!dets.length) {
       const p = document.createElement('span');
@@ -248,6 +291,10 @@ export function initFinale(root: HTMLElement): void {
     }
   }
 
+  el.playOverlay.addEventListener('click', () => {
+    const s = $selected.get();
+    if (s?.overlay) play(events[s.index]!, 'overlay', s.overlay.det);
+  });
   el.playModel.addEventListener('click', () => {
     const s = $selected.get();
     if (s) play(events[s.index]!, 'model', null);

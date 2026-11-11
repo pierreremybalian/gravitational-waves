@@ -174,7 +174,6 @@ export default function detectorsScene(): BlockScene {
       g.site.L1 = 1 + 4 * bump(tau, dtL, 0.0016) * g.show.front;
       g.site.V1 = 0.35;
       g.site.K1 = 0.35;
-      g.update();
 
       // ── Camera ──
       const drift = reduced ? 0 : Math.sin(elapsed * 0.05) * 1.5;
@@ -190,6 +189,8 @@ export default function detectorsScene(): BlockScene {
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
       camera.updateMatrixWorld();
+      g.eye.copy(camera.position);
+      g.update();
 
       // ── Traces (camera-fixed, lower part of the view) ──
       const tr = STEPS.traces(local);

@@ -4,7 +4,8 @@
 // or mass against distance. The intro scroll lays the events out in order of discovery; then the finale UI
 // (src/finale/ui) drives the view, filters and selection. The selected event gets a ring, a small binary above its
 // remnant turning with its model chirp (src/finale/model.ts) on the transport clock, and a strip of its whitened
-// data per detector (and the model when that plays) with a playhead locked to what is heard.
+// data per detector with the processed model drawn over Hanford's row where it was aligned (src/finale/overlay.ts),
+// playheads locked to what is heard.
 
 import { Group, PerspectiveCamera, Scene, Vector3, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
 import type { BlockScene, RenderContext } from '../types.ts';
@@ -29,6 +30,8 @@ const KIND_RGB: Record<Kind, RGB> = {
   candidate: [0.5, 0.56, 0.72],
 };
 const REMNANT: RGB = [1.0, 0.94, 0.86];
+/** Data rows are drawn clipped at this many noise σ. */
+const CLIP = 9;
 const MASS_MARKS = [1, 3, 10, 30, 100] as const;
 const DIST_MARKS = [100, 1000, 10000] as const;
 const YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025] as const;
@@ -64,6 +67,13 @@ export default function catalogueScene(): BlockScene {
   let stripDets: string[] = [];
   let stripData: Float32Array[] = [];
   let stripModel = -1;
+  /** Row the model is drawn over (the overlay's detector), or −1 when it has its own row (no data). */
+  let modelOn = -1;
+  let modelArr: Float32Array = new Float32Array(0);
+  let modelT0 = 0;
+  let modelFs = 2048;
+  /** Data time of the model's merger (the alignment's offset). */
+  let modelShift = 0;
   let stripT0 = 0;
   let stripFs = 2048;
   let heads: GlowPoints;
@@ -94,7 +104,7 @@ export default function catalogueScene(): BlockScene {
     { id: 's1', text: '', tone: 'b', side: 'right', size: 'sm' },
     { id: 's2', text: '', tone: 'light', side: 'right', size: 'sm' },
     { id: 's3', text: '', tone: 'mute', side: 'right', size: 'sm' },
-    { id: 's4', text: 'Model chirp (modelled)', tone: 'plain', side: 'right', size: 'sm' },
+    { id: 's4', text: 'Model chirp (modelled)', tone: 'plain', side: 'left', size: 'sm' },
   ]);
   const LM = MASS_MARKS.map((m) => labels.index(`m${m}`));
   const LD = DIST_MARKS.map((d) => labels.index(`d${d}`));
@@ -133,6 +143,8 @@ export default function catalogueScene(): BlockScene {
     stripDets = [];
     stripData = [];
     stripModel = -1;
+    modelOn = -1;
+    modelShift = 0;
     if (!sel) return;
     const ev = events[sel.index]!;
     const specs: LineSpec[] = [];
@@ -145,13 +157,29 @@ export default function catalogueScene(): BlockScene {
         if (!arr) continue;
         stripDets.push(d);
         stripData.push(arr);
-        specs.push({ points: tracePoints(arr, sn.t0, sn.fs, sn.t0, sn.t0 + sn.n / sn.fs, 1, 2), colour: detColour(d), width: 1.1, intensity: 0.75 });
+        const pts = tracePoints(arr, sn.t0, sn.fs, sn.t0, sn.t0 + sn.n / sn.fs, 1, 2);
+        // Glitches (GW170817's Livingston reaches ~300 σ) drawn clipped so they do not cross the other rows.
+        for (let k = 1; k < pts.length; k += 2) pts[k] = Math.max(-CLIP, Math.min(CLIP, pts[k]!));
+        specs.push({ points: pts, colour: detColour(d), width: 1.1, intensity: 0.75 });
       }
     }
-    if (sel.model) {
-      const m = sel.model;
+    const ov = sel.overlay;
+    if (ov && sn) {
+      // The aligned model over its detector's row, on the same time axis.
+      modelOn = stripDets.indexOf(ov.det);
+      modelArr = ov.model;
+      modelT0 = ov.t0;
+      modelFs = ov.fs;
+      modelShift = ov.align.offset;
       stripModel = specs.length;
-      specs.push({ points: tracePoints(m.h, m.t0, m.fs, m.t0, m.t0 + m.h.length / m.fs, 1, 2), colour: PAL.both, width: 1.3, intensity: 0.9 });
+      specs.push({ points: tracePoints(ov.model, ov.t0, ov.fs, sn.t0, sn.t0 + sn.n / sn.fs, 1, 1), colour: PAL.both, width: 1.0, intensity: 0.7 });
+    } else if (sel.processed) {
+      const m = sel.processed;
+      modelArr = m.h;
+      modelT0 = m.t0;
+      modelFs = m.fs;
+      stripModel = specs.length;
+      specs.push({ points: tracePoints(m.h, m.t0, m.fs, m.t0, m.t0 + m.h.length / m.fs, 1, 1), colour: PAL.both, width: 1.3, intensity: 0.9 });
     }
     if (!specs.length) return;
     stripLines = createLines(specs, { resolution: ctx.globals.uResolution });
@@ -346,7 +374,8 @@ export default function catalogueScene(): BlockScene {
       let binOn = 0;
       if (sel >= 0 && selModelTrack) {
         binOn = 1;
-        const t = mine ? Math.min(ch.t, selModelTrack.t0 + selModelTrack.f.length / selModelTrack.fs) : selModelTrack.t0;
+        // Data clips and the aligned model share the data's clock; the model's merger is at modelShift on it.
+        const t = mine ? Math.min(ch.t - modelShift, selModelTrack.t0 + selModelTrack.f.length / selModelTrack.fs) : selModelTrack.t0;
         binaryAt(selModelTrack, selMasses, Math.min(t, 0), bs);
         pos(sel, tgt, 'f');
         tgt.y += 0.42;
@@ -400,7 +429,7 @@ export default function catalogueScene(): BlockScene {
       strip.updateMatrixWorld();
       const half = params.stripDepth * Math.tan((params.fov * Math.PI) / 360);
       const halfW = half * camera.aspect;
-      const rows = stripDets.length + (stripModel >= 0 ? 1 : 0);
+      const rows = stripDets.length + (stripModel >= 0 && modelOn < 0 ? 1 : 0);
       const sw = halfW * 1.5;
       const showStrip = tool && sel >= 0 && stripLines ? 1 : 0;
       if (stripLines) {
@@ -410,38 +439,53 @@ export default function catalogueScene(): BlockScene {
         const x0 = -sw / 2 - sx * (ev.snippet?.t0 ?? -1.75);
         const rowH = Math.min(0.17, (half * 0.34) / Math.max(1, rows));
         const yTop = -half * 0.6;
+        const rowOf = (r: number) => (r === stripModel && modelOn >= 0 ? modelOn : r);
+        const kind = mine ? pl!.kind : null;
         for (let r = 0; r < stripLines.state.length; r++) {
           const s = stripLines.state[r]!;
+          const isModel = r === stripModel;
           s.x = x0;
-          s.y = yTop - r * rowH;
+          s.y = yTop - rowOf(r) * rowH;
           s.sx = sx;
-          s.sy = r === stripModel ? rowH * 0.42 : rowH * 0.06;
+          // Over the data the model is drawn at about the data's noise-peak height, so both read.
+          s.sy = isModel ? rowH * (modelOn >= 0 ? 0.3 : 0.42) : rowH * 0.06;
           s.z = 0;
-          const playingThis = mine && ((pl!.kind === 'model' && r === stripModel) || (pl!.kind === 'data' && stripDets[r] === pl!.det));
-          s.intensity = showStrip * (playingThis ? 1.2 : 0.55);
+          const heard = isModel ? kind === 'model' || kind === 'overlay' : (kind === 'data' || kind === 'overlay') && stripDets[r] === pl!.det;
+          s.intensity = showStrip * (heard ? (isModel ? 1.25 : kind === 'overlay' ? 0.75 : 1.2) : isModel ? 0.45 : 0.55);
         }
         stripLines.commit();
         // Row names: detectors in order, then the model (label slot 4).
         for (let k = 0; k < 5; k++) labels.hide(LS[k]!);
         if (showStrip) {
-          for (let r = 0; r < rows; r++) {
-            const isModel = r === stripModel;
-            const li = LS[isModel ? 4 : Math.min(r, 3)]!;
-            if (!isModel) labels.setText(li, stripDets[r]!);
+          for (let r = 0; r < stripDets.length; r++) {
+            const li = LS[Math.min(r, 3)]!;
+            labels.setText(li, stripDets[r]!);
             v.set(-sw / 2 - 0.02, yTop - r * rowH + 0.06, 0);
             strip.localToWorld(v);
             labels.place(li, v.x, v.y, v.z, camera, 0.9);
+          }
+          if (stripModel >= 0) {
+            // Over its detector's row (right end) or on its own row below the data.
+            const r = modelOn >= 0 ? modelOn : stripDets.length;
+            v.set(sw / 2, yTop - r * rowH + 0.06, 0);
+            strip.localToWorld(v);
+            labels.place(LS[4]!, v.x, v.y, v.z, camera, 0.9);
           }
         }
         // Playhead on the row playing.
         for (let k = 0; k < 6; k++) heads.set(k, 0, 0, 0, 0);
         if (mine && ch.playing) {
-          const isModel = pl!.kind === 'model';
-          const r = isModel ? stripModel : stripDets.indexOf(pl!.det ?? '');
-          if (r >= 0) {
-            const m = $selected.get()?.model;
-            const y = isModel ? (m ? rowH * 0.42 * sampleSeries(m.h, m.t0, m.fs, ch.t) : 0) : rowH * 0.06 * sampleSeries(stripData[r]!, stripT0, stripFs, ch.t);
-            heads.set(0, x0 + sx * ch.t, yTop - r * rowH + y, 0, 1);
+          const k = pl!.kind;
+          const rd = stripDets.indexOf(pl!.det ?? '');
+          // One shared playhead time; a head on the data and one on the model where each is heard.
+          if ((k === 'data' || k === 'overlay') && rd >= 0) {
+            const y = Math.max(-CLIP, Math.min(CLIP, sampleSeries(stripData[rd]!, stripT0, stripFs, ch.t)));
+            heads.set(0, x0 + sx * ch.t, yTop - rd * rowH + rowH * 0.06 * y, 0, k === 'overlay' ? 0.7 : 1);
+          }
+          if ((k === 'model' || k === 'overlay') && stripModel >= 0) {
+            const r = modelOn >= 0 ? modelOn : stripDets.length;
+            const y = rowH * (modelOn >= 0 ? 0.3 : 0.42) * sampleSeries(modelArr, modelT0, modelFs, ch.t);
+            heads.set(1, x0 + sx * ch.t, yTop - r * rowH + y, 0, 1);
           }
         }
         heads.commit();
