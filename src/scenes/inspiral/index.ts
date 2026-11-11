@@ -17,7 +17,7 @@ import { createRibbon, type Ribbon } from '../../shared/space/ribbon.ts';
 import { C } from '../../gw/units.ts';
 import { inspiral, keplerSeparationKm, keplerSpeedC } from '../../script/inspiral.ts';
 import { METRES_PER_UNIT, WAVE_SPEED_FRACTION } from '../../script/binary.ts';
-import { SLOW_INSPIRAL, slowDuration } from '../../script/slow.ts';
+import { SLOW_INSPIRAL } from '../../script/slow.ts';
 import { TM1, TM2, TM_FINAL } from '../../script/gw150914.ts';
 import { GW150914 } from '../../shared/gwdata.ts';
 import { track } from '../../time/tracks.ts';
@@ -65,8 +65,6 @@ export default function inspiralScene(): BlockScene {
   const L = { sep: labels.index('sep'), freq: labels.index('freq'), wave: labels.index('wave') };
   let shownSep = -1;
   let shownF = -1;
-  const speed = 1 / SLOW_INSPIRAL.slow;
-  const dur = slowDuration(SLOW_INSPIRAL);
   const span = SLOW_INSPIRAL.to - SLOW_INSPIRAL.from;
 
   const self: BlockScene = {
@@ -127,10 +125,8 @@ export default function inspiralScene(): BlockScene {
     update(local, _dt, elapsed) {
       const reduced = $reducedMotion.get();
       rig.drift = reduced ? 0 : 1;
-      // Fallback (no clip of ours yet): the scroll walks the same 0.6 s, slower near the merger.
-      const u = Math.min(1, Math.max(0, (local - 0.05) / 0.9));
-      const fallback = SLOW_INSPIRAL.from + span * (1 - (1 - u) * (1 - u) * 0.98);
-      clipClock(ctx.chirp, SLOW_INSPIRAL.id, speed, dur, fallback, clock);
+      // The audio clock alone sets the binary's time; the scroll only frames the camera and the beats.
+      clipClock(ctx.chirp, SLOW_INSPIRAL, clock);
       const t = clock.t;
       const intro = Math.min(1, local / 0.1);
       view.grid.spiral.value = params.spiral * (0.5 + 0.5 * clock.dip) * intro;

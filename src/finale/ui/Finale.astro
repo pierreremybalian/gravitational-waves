@@ -61,11 +61,13 @@
         <dl class="facts" data-facts></dl>
         <p class="dets" data-dets></p>
         <div class="play" role="group" aria-label="Listen">
+          <button type="button" class="model" data-play-model>Model chirp <span>modelled</span></button>
+          <button type="button" class="model" data-play-true hidden>True pitch <span>modelled</span></button>
           <button type="button" class="model" data-play-overlay hidden>Model over the data <span>modelled</span></button>
           <div class="play-data" data-play-data></div>
-          <button type="button" class="model" data-play-model>Model alone <span>modelled</span></button>
           <button type="button" class="stop" data-stop>Stop</button>
         </div>
+        <p class="listen" data-listen hidden></p>
         <p class="sound-hint" data-sound-hint hidden><button type="button" data-sound-on>Turn sound on</button> to hear it.</p>
         <p class="note" data-note></p>
         <p class="src"><a data-link rel="noopener" target="_blank">GWOSC event page</a></p>
@@ -386,6 +388,11 @@
     color: var(--color-st-modelled);
   }
   .play .stop {
+    color: var(--color-mute);
+  }
+  .listen {
+    font-size: 0.76rem;
+    line-height: 1.45;
     color: var(--color-mute);
   }
   .sound-hint {

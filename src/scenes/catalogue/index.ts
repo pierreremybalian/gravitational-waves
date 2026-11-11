@@ -3,9 +3,9 @@
 // published parameters as hollow beads on the floor. Two arrangements (src/finale/layout.ts): a spiral of discovery,
 // or mass against distance. The intro scroll lays the events out in order of discovery; then the finale UI
 // (src/finale/ui) drives the view, filters and selection. The selected event gets a ring, a small binary above its
-// remnant turning with its model chirp (src/finale/model.ts) on the transport clock, and a strip of its whitened
-// data per detector with the processed model drawn over Hanford's row where it was aligned (src/finale/overlay.ts),
-// playheads locked to what is heard.
+// remnant turning with its model chirp (src/finale/model.ts) on the transport clock, and a strip over the listening
+// window (src/finale/listen.ts): its whitened data per detector, the processed model over Hanford's row where it was
+// aligned (src/finale/overlay.ts), and the model chirp alone on its own row, playheads locked to what is heard.
 
 import { Group, PerspectiveCamera, Scene, Vector3, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
 import type { BlockScene, RenderContext } from '../types.ts';
@@ -76,6 +76,14 @@ export default function catalogueScene(): BlockScene {
   let modelShift = 0;
   let stripT0 = 0;
   let stripFs = 2048;
+  /** The strip's window in model time (0 = the model's merger): the listening window, what is heard. */
+  let winFrom = -1;
+  let winTo = 0.3;
+  /** Row of the listening model (the default sound), or −1. */
+  let stripListen = -1;
+  let listenArr: Float32Array = new Float32Array(0);
+  let listenT0 = 0;
+  let listenFs = 4096;
   let heads: GlowPoints;
   let W = 1280;
   let H = 720;
@@ -104,7 +112,8 @@ export default function catalogueScene(): BlockScene {
     { id: 's1', text: '', tone: 'b', side: 'right', size: 'sm' },
     { id: 's2', text: '', tone: 'light', side: 'right', size: 'sm' },
     { id: 's3', text: '', tone: 'mute', side: 'right', size: 'sm' },
-    { id: 's4', text: 'Model chirp (modelled)', tone: 'plain', side: 'left', size: 'sm' },
+    { id: 's4', text: 'Model over the data', tone: 'plain', side: 'left', size: 'sm' },
+    { id: 's5', text: 'Model chirp (modelled)', tone: 'plain', side: 'right', size: 'sm' },
   ]);
   const LM = MASS_MARKS.map((m) => labels.index(`m${m}`));
   const LD = DIST_MARKS.map((d) => labels.index(`d${d}`));
@@ -113,7 +122,7 @@ export default function catalogueScene(): BlockScene {
   const LC = labels.index('cand');
   const LSEL = labels.index('sel');
   const LHOV = labels.index('hover');
-  const LS = [0, 1, 2, 3, 4].map((k) => labels.index(`s${k}`));
+  const LS = [0, 1, 2, 3, 4, 5].map((k) => labels.index(`s${k}`));
   let yearXZ: ([number, number] | null)[] = [];
   let candXZ: [number, number] = [0, 0];
 
@@ -143,12 +152,20 @@ export default function catalogueScene(): BlockScene {
     stripDets = [];
     stripData = [];
     stripModel = -1;
+    stripListen = -1;
     modelOn = -1;
     modelShift = 0;
     if (!sel) return;
     const ev = events[sel.index]!;
     const specs: LineSpec[] = [];
     const sn = ev.snippet;
+    // Everything on the model's clock over the listening window; data (on the catalogue clock) shifted by the
+    // alignment so the model's merger lines up.
+    modelShift = sel.shift;
+    winFrom = sel.listen ? sel.listen.win.from : -1.0;
+    winTo = sel.listen ? sel.listen.win.to : 0.3;
+    const a = winFrom + modelShift;
+    const b = winTo + modelShift;
     if (sel.snippets && sn) {
       stripT0 = sn.t0;
       stripFs = sn.fs;
@@ -157,7 +174,7 @@ export default function catalogueScene(): BlockScene {
         if (!arr) continue;
         stripDets.push(d);
         stripData.push(arr);
-        const pts = tracePoints(arr, sn.t0, sn.fs, sn.t0, sn.t0 + sn.n / sn.fs, 1, 2);
+        const pts = tracePoints(arr, sn.t0, sn.fs, a, b, 1, 1, 1, -modelShift);
         // Glitches (GW170817's Livingston reaches ~300 σ) drawn clipped so they do not cross the other rows.
         for (let k = 1; k < pts.length; k += 2) pts[k] = Math.max(-CLIP, Math.min(CLIP, pts[k]!));
         specs.push({ points: pts, colour: detColour(d), width: 1.1, intensity: 0.75 });
@@ -165,21 +182,23 @@ export default function catalogueScene(): BlockScene {
     }
     const ov = sel.overlay;
     if (ov && sn) {
-      // The aligned model over its detector's row, on the same time axis.
+      // The aligned (whitened) model over its detector's row.
       modelOn = stripDets.indexOf(ov.det);
       modelArr = ov.model;
       modelT0 = ov.t0;
       modelFs = ov.fs;
-      modelShift = ov.align.offset;
       stripModel = specs.length;
-      specs.push({ points: tracePoints(ov.model, ov.t0, ov.fs, sn.t0, sn.t0 + sn.n / sn.fs, 1, 1), colour: PAL.both, width: 1.0, intensity: 0.7 });
-    } else if (sel.processed) {
-      const m = sel.processed;
-      modelArr = m.h;
-      modelT0 = m.t0;
-      modelFs = m.fs;
-      stripModel = specs.length;
-      specs.push({ points: tracePoints(m.h, m.t0, m.fs, m.t0, m.t0 + m.h.length / m.fs, 1, 1), colour: PAL.both, width: 1.3, intensity: 0.9 });
+      specs.push({ points: tracePoints(ov.model, ov.t0, ov.fs, a, b, 1, 1, 1, -modelShift), colour: PAL.both, width: 1.0, intensity: 0.7 });
+    }
+    if (sel.listen) {
+      // The model chirp alone (the default sound) on its own row, at true pitch, over the window.
+      const m = sel.listen.model;
+      listenArr = m.h;
+      listenT0 = m.t0;
+      listenFs = m.fs;
+      stripListen = specs.length;
+      specs.push({ points: tracePoints(m.h, m.t0, m.fs, winFrom, winTo, 1, 1), colour: PAL.both, width: 1.3, intensity: 0.9 });
+      labels.setText(LS[5]!, sel.listen.pitch === 1 ? 'Model chirp (modelled)' : `Model chirp (modelled) · heard ×${sel.listen.pitch}`);
     }
     if (!specs.length) return;
     stripLines = createLines(specs, { resolution: ctx.globals.uResolution });
@@ -375,7 +394,9 @@ export default function catalogueScene(): BlockScene {
       if (sel >= 0 && selModelTrack) {
         binOn = 1;
         // Data clips and the aligned model share the data's clock; the model's merger is at modelShift on it.
-        const t = mine ? Math.min(ch.t - modelShift, selModelTrack.t0 + selModelTrack.f.length / selModelTrack.fs) : selModelTrack.t0;
+        // The model chirp alone plays on the model's clock; data and overlay on the data's (merger at modelShift).
+        const tm = pl?.kind === 'model' ? ch.t : ch.t - modelShift;
+        const t = mine ? Math.min(tm, selModelTrack.t0 + selModelTrack.f.length / selModelTrack.fs) : selModelTrack.t0;
         binaryAt(selModelTrack, selMasses, Math.min(t, 0), bs);
         pos(sel, tgt, 'f');
         tgt.y += 0.42;
@@ -429,33 +450,34 @@ export default function catalogueScene(): BlockScene {
       strip.updateMatrixWorld();
       const half = params.stripDepth * Math.tan((params.fov * Math.PI) / 360);
       const halfW = half * camera.aspect;
-      const rows = stripDets.length + (stripModel >= 0 && modelOn < 0 ? 1 : 0);
+      const rows = stripDets.length + (stripListen >= 0 ? 1 : 0);
       const sw = halfW * 1.5;
       const showStrip = tool && sel >= 0 && stripLines ? 1 : 0;
       if (stripLines) {
-        const ev = events[sel]!;
-        const span = ev.snippet ? ev.snippet.n / ev.snippet.fs : 2;
+        const span = Math.max(0.05, winTo - winFrom);
         const sx = sw / span;
-        const x0 = -sw / 2 - sx * (ev.snippet?.t0 ?? -1.75);
+        const x0 = -sw / 2 - sx * winFrom;
         const rowH = Math.min(0.17, (half * 0.34) / Math.max(1, rows));
         const yTop = -half * 0.6;
-        const rowOf = (r: number) => (r === stripModel && modelOn >= 0 ? modelOn : r);
+        const listenRow = stripDets.length;
+        const rowOf = (r: number) => (r === stripModel ? modelOn : r === stripListen ? listenRow : r);
         const kind = mine ? pl!.kind : null;
         for (let r = 0; r < stripLines.state.length; r++) {
           const s = stripLines.state[r]!;
           const isModel = r === stripModel;
+          const isListen = r === stripListen;
           s.x = x0;
           s.y = yTop - rowOf(r) * rowH;
           s.sx = sx;
           // Over the data the model is drawn at about the data's noise-peak height, so both read.
-          s.sy = isModel ? rowH * (modelOn >= 0 ? 0.3 : 0.42) : rowH * 0.06;
+          s.sy = isModel ? rowH * 0.3 : isListen ? rowH * 0.42 : rowH * 0.06;
           s.z = 0;
-          const heard = isModel ? kind === 'model' || kind === 'overlay' : (kind === 'data' || kind === 'overlay') && stripDets[r] === pl!.det;
-          s.intensity = showStrip * (heard ? (isModel ? 1.25 : kind === 'overlay' ? 0.75 : 1.2) : isModel ? 0.45 : 0.55);
+          const heard = isListen ? kind === 'model' : isModel ? kind === 'overlay' : (kind === 'data' || kind === 'overlay') && stripDets[r] === pl!.det;
+          s.intensity = showStrip * (heard ? (isModel || isListen ? 1.25 : kind === 'overlay' ? 0.75 : 1.2) : isModel ? 0.35 : isListen ? 0.5 : 0.55);
         }
         stripLines.commit();
-        // Row names: detectors in order, then the model (label slot 4).
-        for (let k = 0; k < 5; k++) labels.hide(LS[k]!);
+        // Row names: detectors in order, the model over the data (slot 4), the model chirp alone (slot 5).
+        for (let k = 0; k < LS.length; k++) labels.hide(LS[k]!);
         if (showStrip) {
           for (let r = 0; r < stripDets.length; r++) {
             const li = LS[Math.min(r, 3)]!;
@@ -464,28 +486,34 @@ export default function catalogueScene(): BlockScene {
             strip.localToWorld(v);
             labels.place(li, v.x, v.y, v.z, camera, 0.9);
           }
-          if (stripModel >= 0) {
-            // Over its detector's row (right end) or on its own row below the data.
-            const r = modelOn >= 0 ? modelOn : stripDets.length;
-            v.set(sw / 2, yTop - r * rowH + 0.06, 0);
+          if (stripModel >= 0 && kind === 'overlay') {
+            v.set(sw / 2, yTop - modelOn * rowH + 0.06, 0);
             strip.localToWorld(v);
             labels.place(LS[4]!, v.x, v.y, v.z, camera, 0.9);
           }
+          if (stripListen >= 0) {
+            v.set(-sw / 2 - 0.02, yTop - listenRow * rowH + 0.06, 0);
+            strip.localToWorld(v);
+            labels.place(LS[5]!, v.x, v.y, v.z, camera, 0.9);
+          }
         }
-        // Playhead on the row playing.
+        // Playhead on the row playing, at the model time being heard.
         for (let k = 0; k < 6; k++) heads.set(k, 0, 0, 0, 0);
         if (mine && ch.playing) {
           const k = pl!.kind;
           const rd = stripDets.indexOf(pl!.det ?? '');
-          // One shared playhead time; a head on the data and one on the model where each is heard.
+          if (k === 'model' && stripListen >= 0) {
+            const y = rowH * 0.42 * sampleSeries(listenArr, listenT0, listenFs, ch.t);
+            heads.set(1, x0 + sx * ch.t, yTop - listenRow * rowH + y, 0, 1);
+          }
+          const tm = ch.t - modelShift;
           if ((k === 'data' || k === 'overlay') && rd >= 0) {
             const y = Math.max(-CLIP, Math.min(CLIP, sampleSeries(stripData[rd]!, stripT0, stripFs, ch.t)));
-            heads.set(0, x0 + sx * ch.t, yTop - rd * rowH + rowH * 0.06 * y, 0, k === 'overlay' ? 0.7 : 1);
+            heads.set(0, x0 + sx * tm, yTop - rd * rowH + rowH * 0.06 * y, 0, k === 'overlay' ? 0.7 : 1);
           }
-          if ((k === 'model' || k === 'overlay') && stripModel >= 0) {
-            const r = modelOn >= 0 ? modelOn : stripDets.length;
-            const y = rowH * (modelOn >= 0 ? 0.3 : 0.42) * sampleSeries(modelArr, modelT0, modelFs, ch.t);
-            heads.set(1, x0 + sx * ch.t, yTop - r * rowH + y, 0, 1);
+          if (k === 'overlay' && stripModel >= 0 && modelOn >= 0) {
+            const y = rowH * 0.3 * sampleSeries(modelArr, modelT0, modelFs, ch.t);
+            heads.set(2, x0 + sx * tm, yTop - modelOn * rowH + y, 0, 1);
           }
         }
         heads.commit();

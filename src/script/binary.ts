@@ -2,7 +2,7 @@
 // (orbital phase = half the wave's), radiating a two-armed spiral of waves; time slowed, pitch raised, both stated.
 import { registerStage } from './index.ts';
 import type { SoundRequest } from '../audio/schedule.ts';
-import { SLOW_BINARY } from './slow.ts';
+import { LOOP_GAP, SLOW_BINARY } from './slow.ts';
 import { TM1, TM2 } from './gw150914.ts';
 import { ramp } from '../time/tracks.ts';
 
@@ -15,7 +15,7 @@ export const binaryField = (local: number) => ramp(local, 0.26, 0.5);
 /** The "twice per orbit" probe: a point on the sheet that flashes with each crest. */
 export const binaryProbe = (local: number) => ramp(local, 0.6, 0.72);
 
-const REQ: SoundRequest = { clip: SLOW_BINARY.id, loop: true, gap: 0.6 };
+const REQ: SoundRequest = { clip: SLOW_BINARY.id, loop: true, gap: LOOP_GAP };
 
 export const binary = registerStage('binary', {
   note: `Modelled: the orbit turns with the best-fit template’s own phase, at half the wave’s frequency, with sizes from Kepler’s law and the horizons to scale. Time is slowed ×${SLOW_BINARY.slow} and the tone raised ×${SLOW_BINARY.pitch} (three octaves) so you can follow it; the waves’ height pictures strain, and they are drawn at ${WAVE_SPEED_FRACTION} of light speed so the spiral fits.`,

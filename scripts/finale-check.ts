@@ -1,9 +1,11 @@
 // Finale check (HANDOFF Verification): open the page at the catalogue, select events through the panel (search,
 // quick picks, keyboard), and assert that the card's numbers match public/data/events.json, that the event's data
 // clip plays on the transport (and the model chirp where there are masses), that candidates show no model, and that
-// the page logs no errors. Overlay (model over Hanford's data): selecting an event with masses plays it by default;
-// its clip starts with the data's (same t0, same length, sample for sample) and the model layer inside the mix,
-// recovered independently, sits within 2 ms of the offset the page computed. Screenshots (desktop and phone) go to scratch/shots/finale/.
+// the page logs no errors. Default sound (owner fix): selecting an event with masses plays the model chirp alone,
+// trimmed to its audible window (src/finale/listen.ts), at pitch ×4 when it peaks below 120 Hz (stated on the card,
+// with a true-pitch button); the model-over-data and data clips are cut to the same window around the aligned
+// merger (same t0 and length as each other), and the model layer inside the mix, recovered independently, sits
+// within 2 ms of the offset the page computed. Screenshots (desktop and phone) go to scratch/shots/finale/.
 // Usage: node scripts/finale-check.ts [--base http://localhost:4390] [--webgl]
 import { chromium, type Page } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -11,6 +13,7 @@ import { stageIndex, stageToProgress } from '../src/time/stages.ts';
 import type { Catalog, CatalogEvent, Interval } from '../src/shared/gwdata.ts';
 import { modelChirp } from '../src/finale/model.ts';
 import { alignModel, MIX, processModel } from '../src/finale/overlay.ts';
+import { autoPitch, listenModel, listenWindow } from '../src/finale/listen.ts';
 
 const args = process.argv.slice(2);
 const base = args.includes('--base') ? args[args.indexOf('--base') + 1]! : 'http://localhost:4390';
@@ -90,8 +93,23 @@ interface OverlayDebug {
   data: number[];
   model: number[];
   mix: number[];
+  from: number;
+  to: number;
   clips: Record<string, { t0: number; duration: number } | null>;
 }
+
+/** What the page should play by default for an event with masses. */
+function expectedListen(ev: CatalogEvent) {
+  const m = listenModel({ m1: med(ev.m1)!, m2: med(ev.m2)!, mFinal: med(ev.mFinal), redshift: med(ev.redshift), bns: ev.type === 'BNS' }, ev.type === 'BNS' || ev.type === 'NSBH');
+  const pitch = autoPitch(m);
+  return { win: listenWindow(m), pitch, clip: `model:${ev.name}${pitch === 1 ? '' : `:x${pitch}`}` };
+}
+
+const clipInfo = (page: Page, id: string) =>
+  page.evaluate((i) => {
+    const r = (window as unknown as { __transport: { info(id: string): { t0: number; duration: number } | undefined } }).__transport.info(i);
+    return r ? { t0: r.t0, duration: r.duration } : null;
+  }, id);
 
 async function checkOverlay(page: Page, ev: CatalogEvent): Promise<OverlayDebug | null> {
   const o = (await page.evaluate((name) => {
@@ -107,15 +125,21 @@ async function checkOverlay(page: Page, ev: CatalogEvent): Promise<OverlayDebug 
       data: Array.from(f.data),
       model: Array.from(f.model),
       mix: Array.from(f.mix),
-      clips: { overlay: info(`overlay:${name}`), model: info(`model:${name}`), data: info(`event:${name}:${f.det}`) },
+      clips: { overlay: info(`overlay:${name}`), data: info(`event:${name}:${f.det}`) },
     };
   }, ev.name)) as OverlayDebug | null;
   if (!o) {
     ok(false, `${ev.name}: overlay state exposed`);
     return null;
   }
-  const { overlay, model, data } = o.clips;
-  ok(!!overlay && !!data && !!model && overlay.t0 === data.t0 && model.t0 === data.t0 && Math.abs(overlay.duration - data.duration) < 1e-9 && Math.abs(model.duration - data.duration) < 1e-9, `${ev.name}: overlay, model and ${o.det} data clips start together (t0 ${data?.t0} s, ${data?.duration.toFixed(3)} s each)`);
+  const { overlay, data } = o.clips;
+  const L = expectedListen(ev);
+  const snipStart = ev.snippet!.t0;
+  const wantT0 = Math.max(snipStart, o.offset + L.win.from);
+  ok(
+    !!overlay && !!data && overlay.t0 === data.t0 && Math.abs(overlay.duration - data.duration) < 1e-9 && Math.abs(data.t0 - wantT0) < 1.5 / o.fs && data.duration <= L.win.to - L.win.from + 2 / o.fs,
+    `${ev.name}: overlay and ${o.det} data clips cut to the listening window around the aligned merger (t0 ${data?.t0.toFixed(3)} s, want ${wantT0.toFixed(3)}; ${data?.duration.toFixed(3)} s of ${(ev.snippet!.n / ev.snippet!.fs).toFixed(2)} s)`,
+  );
   ok(o.mix.length === o.data.length && o.model.length === o.data.length, `${ev.name}: mix is sample for sample over the data (${o.mix.length} samples)`);
   // The model layer inside the mix (mix − limited data), aligned independently against a model rebuilt here.
   const c = MIX.dataCeil;
@@ -156,24 +180,44 @@ function checkCard(f: Record<string, string>, ev: CatalogEvent) {
     checkCard(await facts(page), ev);
     const det = ['H1', 'L1', 'V1', 'K1', 'G1'].find((d) => ev.snippet?.detectors.includes(d));
     const modelHidden = (await page.evaluate(() => (document.querySelector("[data-play-model]") as HTMLElement).hidden)) as boolean;
-    if (ev.m1 !== null && det) {
-      ok(await waitClip(page, `overlay:${name}`), `${name}: model over the data plays by default`);
-      const chip = await page.evaluate(() => document.querySelector('[data-acc-chip]')?.getAttribute('data-st'));
-      ok(chip === 'modelled', `${name}: status chip says modelled while the overlay plays (${chip})`);
-      ok(/modelled/i.test((await page.textContent('[data-play-overlay]')) ?? ''), `${name}: overlay button labelled modelled`);
-      await checkOverlay(page, ev);
-      await page.waitForTimeout(500);
-      await page.screenshot({ path: `${OUT}/finale-desktop-overlay-${name}.png` });
-      await page.click(`[data-det="${det}"]`);
-      ok(await waitClip(page, `event:${name}:${det}`), `${name}: ${det} data alone plays`);
-    } else if (det) ok(await waitClip(page, `event:${name}:${det}`), `${name}: ${det} data plays on the transport`);
     if (ev.m1 !== null) {
+      const L = expectedListen(ev);
       ok(!modelHidden, `${name}: model chirp offered`);
-      await page.click('[data-play-model]');
-      ok(await waitClip(page, `model:${name}`), `${name}: model alone plays`);
+      ok(await waitClip(page, L.clip), `${name}: the model chirp alone plays by default (${L.clip})`);
+      const info = await clipInfo(page, L.clip);
+      ok(!!info && Math.abs(info.t0 - L.win.from) < 1e-9 && Math.abs(info.duration - (L.win.to - L.win.from)) < 1e-3, `${name}: trimmed to ${L.win.from.toFixed(3)} … +${L.win.to.toFixed(3)} s (${info?.duration.toFixed(3)} s), pitch ×${L.pitch}`);
       const chip = await page.evaluate(() => document.querySelector('[data-acc-chip]')?.getAttribute('data-st'));
       ok(chip === 'modelled', `${name}: status chip says modelled while the model plays (${chip})`);
-    } else ok(modelHidden, `${name}: no model chirp for a candidate`);
+      const label = (await page.textContent('[data-play-model]')) ?? '';
+      const note = (await page.textContent('[data-listen]')) ?? '';
+      const trueHidden = await page.evaluate(() => (document.querySelector('[data-play-true]') as HTMLElement).hidden === true);
+      if (L.pitch !== 1) ok(/pitch ×4/.test(label) && /Pitch raised ×4/.test(note) && !trueHidden, `${name}: card states pitch ×4 and offers true pitch ("${label.trim()}")`);
+      else ok(!/×4/.test(label) && trueHidden, `${name}: true pitch, no ×4 option`);
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: `${OUT}/finale-desktop-model-${name}.png` });
+      if (L.pitch !== 1) {
+        await page.click('[data-play-true]');
+        ok(await waitClip(page, `model:${name}`), `${name}: true pitch plays`);
+      }
+      if (det) {
+        await page.waitForFunction(() => !(document.querySelector('[data-play-overlay]') as HTMLElement).hidden, null, { timeout: 10000 });
+        ok(/modelled/i.test((await page.textContent('[data-play-overlay]')) ?? ''), `${name}: overlay button labelled modelled`);
+        await page.click('[data-play-overlay]');
+        ok(await waitClip(page, `overlay:${name}`), `${name}: model over the data plays`);
+        await checkOverlay(page, ev);
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: `${OUT}/finale-desktop-overlay-${name}.png` });
+        await page.click(`[data-det="${det}"]`);
+        ok(await waitClip(page, `event:${name}:${det}`), `${name}: ${det} data alone plays`);
+      }
+    } else {
+      ok(modelHidden, `${name}: no model chirp for a candidate`);
+      if (det) {
+        ok(await waitClip(page, `event:${name}:${det}`), `${name}: ${det} data plays on the transport`);
+        const info = await clipInfo(page, `event:${name}:${det}`);
+        ok(!!info && info.duration < 1.4, `${name}: data cut to ${info?.duration.toFixed(2)} s around the catalogue time`);
+      }
+    }
   }
   // Quick pick and keyboard stepping.
   await page.click('[data-pick="loudest"]');
@@ -181,7 +225,7 @@ function checkCard(f: Record<string, string>, ev: CatalogEvent) {
   await page.waitForFunction((n) => document.querySelector('[data-name]')?.textContent === n, loud.name, { timeout: 10000 });
   ok(true, `"The loudest" → ${loud.name} (SNR ${med(loud.snr)})`);
   checkCard(await facts(page), loud);
-  ok(await waitClip(page, `overlay:${loud.name}`), `${loud.name}: model over Hanford data plays`);
+  ok(await waitClip(page, expectedListen(loud).clip), `${loud.name}: model chirp plays`);
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${OUT}/finale-desktop-loudest.png` });
   const i = cat.events.findIndex((e) => e.name === loud.name);

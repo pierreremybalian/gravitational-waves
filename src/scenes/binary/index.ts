@@ -17,7 +17,7 @@ import { defineSlowChirp } from '../../shared/space/slowchirp.ts';
 import { sampleAt } from '../../gw/binary.ts';
 import { C } from '../../gw/units.ts';
 import { binary, binaryField, binaryProbe, METRES_PER_UNIT, WAVE_SPEED_FRACTION } from '../../script/binary.ts';
-import { SLOW_BINARY, slowDuration } from '../../script/slow.ts';
+import { SLOW_BINARY } from '../../script/slow.ts';
 import { TM1, TM2, TM_FINAL } from '../../script/gw150914.ts';
 import { track } from '../../time/tracks.ts';
 
@@ -69,8 +69,6 @@ export default function binaryScene(): BlockScene {
   const L = { h1: labels.index('h1'), h2: labels.index('h2'), orbit: labels.index('orbit'), probe: labels.index('probe') };
   let shownOrbit = -1;
   let shownWave = -1;
-  const speed = 1 / SLOW_BINARY.slow;
-  const dur = slowDuration(SLOW_BINARY);
 
   const self: BlockScene = {
     id: 'binary',
@@ -107,8 +105,8 @@ export default function binaryScene(): BlockScene {
     update(local, _dt, elapsed) {
       const reduced = $reducedMotion.get();
       rig.drift = reduced ? 0 : 1;
-      const fallback = SLOW_BINARY.from + (SLOW_BINARY.to - SLOW_BINARY.from) * local;
-      clipClock(ctx.chirp, SLOW_BINARY.id, speed, dur, fallback, clock);
+      // The audio clock alone sets the binary's time; the scroll only frames the camera and the beats.
+      clipClock(ctx.chirp, SLOW_BINARY, clock);
       const t = clock.t;
       const field = binaryField(local);
       view.grid.spiral.value = params.spiral * field * (0.4 + 0.6 * clock.dip);

@@ -20,3 +20,27 @@ export const SLOW_MERGER: SlowChirpSpec = { id: 'slow-merger', from: -0.035, to:
 
 /** Audio seconds of a spec. */
 export const slowDuration = (s: SlowChirpSpec): number => (s.to - s.from) * s.slow;
+
+/** Seconds of silence between plays of a looping slowed clip. */
+export const LOOP_GAP = 0.45;
+/** Loop seam: the clip's sound fades in and out over this many audio seconds, and the picture dims with it. */
+export const SEAM_FADE = 0.3;
+
+/** Raised-cosine fade at both ends of a clip of `duration` audio seconds (0 at the ends, 1 inside), at `pos`. */
+export function seamGain(pos: number, duration: number, fade = SEAM_FADE): number {
+  const u = Math.min(1, Math.max(0, Math.min(pos, duration - pos) / fade));
+  return 0.5 - 0.5 * Math.cos(Math.PI * u);
+}
+
+/** The data window a stage's clip covers, for its timeline card: ms for windows shorter than 0.2 s. */
+export function windowLabel(s: SlowChirpSpec, t: number): string {
+  if (s.to - s.from < 0.2) {
+    const ms = Math.round(t * 1000);
+    return `${ms > 0 ? '+' : ms < 0 ? '−' : ''}${Math.abs(ms)} ms`;
+  }
+  const v = Math.round(t * 100) / 100;
+  return `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)} s`;
+}
+
+/** The note under the timeline: what the loop is. */
+export const loopNote = (s: SlowChirpSpec): string => `looping · slowed ×${s.slow}, pitch ×${s.pitch}`;

@@ -17,7 +17,7 @@ import { createRibbon, type Ribbon } from '../../shared/space/ribbon.ts';
 import { C } from '../../gw/units.ts';
 import { merger } from '../../script/merger.ts';
 import { METRES_PER_UNIT, WAVE_SPEED_FRACTION } from '../../script/binary.ts';
-import { SLOW_MERGER, slowDuration } from '../../script/slow.ts';
+import { SLOW_MERGER } from '../../script/slow.ts';
 import { M_FINAL, RADIATED_MSUN, TM1, TM2, TM_FINAL } from '../../script/gw150914.ts';
 import { GW150914 } from '../../shared/gwdata.ts';
 import { track } from '../../time/tracks.ts';
@@ -63,8 +63,6 @@ export default function mergerScene(): BlockScene {
   ]);
   const L = { remnant: labels.index('remnant'), burst: labels.index('burst'), ring: labels.index('ring'), merge: labels.index('merge') };
   let shownF = -1;
-  const speed = 1 / SLOW_MERGER.slow;
-  const dur = slowDuration(SLOW_MERGER);
   const span = SLOW_MERGER.to - SLOW_MERGER.from;
 
   const self: BlockScene = {
@@ -129,10 +127,8 @@ export default function mergerScene(): BlockScene {
     update(local, _dt, elapsed) {
       const reduced = $reducedMotion.get();
       rig.drift = reduced ? 0 : 1;
-      // Fallback: the scroll walks −35 ms → +30 ms.
-      const u = Math.min(1, Math.max(0, (local - 0.08) / 0.84));
-      const fallback = SLOW_MERGER.from + span * u;
-      clipClock(ctx.chirp, SLOW_MERGER.id, speed, dur, fallback, clock);
+      // The audio clock alone sets the binary's time; the scroll only frames the camera and the beats.
+      clipClock(ctx.chirp, SLOW_MERGER, clock);
       const t = clock.t;
       const intro = Math.min(1, local / 0.1);
       view.grid.spiral.value = params.spiral * (0.5 + 0.5 * clock.dip) * intro;

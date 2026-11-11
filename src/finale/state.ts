@@ -5,6 +5,7 @@
 import { atom } from 'nanostores';
 import type { CatalogEvent } from '../shared/gwdata.ts';
 import type { ModelChirp } from './model.ts';
+import type { ListenWindow } from './listen.ts';
 import type { Alignment, ProcessedModel } from './overlay.ts';
 import type { View } from './layout.ts';
 
@@ -27,6 +28,19 @@ export interface Selected {
   processed: ProcessedModel | null;
   /** The model laid over one detector's data (Hanford where it has data), once the snippets are in. */
   overlay: Overlay | null;
+  /** The listening model (the default sound): trimmed window, default pitch (src/finale/listen.ts). */
+  listen: Listen | null;
+  /** Data time (s from the catalogue time) of the model's merger: the overlay's offset once aligned, else 0. */
+  shift: number;
+}
+
+export interface Listen {
+  model: ModelChirp;
+  /** Model time (0 = merger) of the window; the data clips are cut to it shifted by `shift`. */
+  win: ListenWindow;
+  /** Default pitch factor (4 when the chirp peaks below 120 Hz) and that peak (Hz). */
+  pitch: number;
+  peakF: number;
 }
 
 export interface Overlay {
@@ -43,7 +57,7 @@ export type PlayKind = 'data' | 'model' | 'overlay';
 export const $selected = atom<Selected | null>(null);
 
 /** What the finale plays now (clip id and what it is), for the scene's strip and the status chip. */
-export const $playing = atom<{ clip: string; name: string; kind: PlayKind; det: string | null } | null>(null);
+export const $playing = atom<{ clip: string; name: string; kind: PlayKind; det: string | null; pitch: number } | null>(null);
 
 /** The panel's footprint: the part of the viewport left for the 3D view (fractions, top-left origin). */
 export const $free = atom<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 1, h: 1 });
@@ -60,6 +74,7 @@ export const $orbit = atom({ az: 0, el: 0 });
 /** Set by the scene: event index under a screen point (fractions, top-left), or −1. */
 export const bridge: { pick: ((fx: number, fy: number) => number) | null } = { pick: null };
 
-export const modelClipId = (name: string): string => `model:${name}`;
+/** The listening clip (model chirp alone, trimmed; pitch ×1 or ×4). Model time: 0 = the model's merger. */
+export const modelClipId = (name: string, pitch = 1): string => `model:${name}${pitch === 1 ? '' : `:x${pitch}`}`;
 
 export const overlayClipId = (name: string): string => `overlay:${name}`;

@@ -3,7 +3,7 @@
 // a separation and a speed (Newtonian estimate, held from 150 Hz where it stops being meaningful).
 import { registerStage } from './index.ts';
 import type { SoundRequest } from '../audio/schedule.ts';
-import { SLOW_INSPIRAL } from './slow.ts';
+import { LOOP_GAP, SLOW_INSPIRAL } from './slow.ts';
 import { CHIRP_MASS_DET, TM } from './gw150914.ts';
 import { relativeSpeed, separation } from '../gw/chirp.ts';
 import { C } from '../gw/units.ts';
@@ -14,7 +14,7 @@ export const KEPLER_MAX_F = 150;
 export const keplerSeparationKm = (f: number) => separation(TM, Math.min(f, KEPLER_MAX_F)) / 1e3;
 export const keplerSpeedC = (f: number) => relativeSpeed(TM, Math.min(f, KEPLER_MAX_F)) / C;
 
-const REQ: SoundRequest = { clip: SLOW_INSPIRAL.id, loop: true, gap: 1.0 };
+const REQ: SoundRequest = { clip: SLOW_INSPIRAL.id, loop: true, gap: LOOP_GAP };
 
 export const inspiral = registerStage('inspiral', {
   note: `Measured frequency, modelled orbit: the gravitational-wave frequency and phase are the best-fit template that matches the data; separation and speed follow from Kepler’s law with the template’s masses (a Newtonian estimate, shown up to ${KEPLER_MAX_F} Hz). Time slowed ×${SLOW_INSPIRAL.slow}, pitch ×${SLOW_INSPIRAL.pitch}.`,

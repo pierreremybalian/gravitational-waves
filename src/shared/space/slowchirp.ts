@@ -7,11 +7,10 @@
 
 import { transport } from '../../audio/transport.ts';
 import { sampleAt } from '../../gw/binary.ts';
-import type { SlowChirpSpec } from '../../script/slow.ts';
+import { seamGain, type SlowChirpSpec } from '../../script/slow.ts';
 import type { TemplateTrack } from './track.ts';
 
 const FS = 16384;
-const FADE = 0.06;
 
 /** Register the clip once (idempotent). */
 export function defineSlowChirp(spec: SlowChirpSpec, tt: TemplateTrack): void {
@@ -28,12 +27,12 @@ export function defineSlowChirp(spec: SlowChirpSpec, tt: TemplateTrack): void {
     ph += (2 * Math.PI * spec.pitch * fj) / FS;
     if (ph > 1e4) ph -= 2 * Math.PI * Math.floor(ph / (2 * Math.PI));
     const a = sampleAt(amp!, t0, fs, t);
-    const tau = j / FS;
-    const env = Math.min(1, tau / FADE, (dur - tau) / FADE);
-    const v = a * Math.sin(ph) * Math.max(0, env);
+    // The loop seam: the same raised-cosine fade the picture dims with (src/shared/space/clock.ts).
+    const v = a * Math.sin(ph) * seamGain(j / FS, dur);
     data[j] = v;
     peak = Math.max(peak, Math.abs(v));
   }
+  // Normalised on the faded clip; the fades keep the peak (it is mid-clip).
   const k = peak > 0 ? 0.89 / peak : 1;
   for (let j = 0; j < n; j++) data[j]! *= k;
   transport.define({ id: spec.id, duration: dur, t0: spec.from, speed: 1 / spec.slow }, { kind: 'samples', data, fs: FS }, spec.gain);

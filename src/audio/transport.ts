@@ -101,6 +101,15 @@ class Transport {
     return info;
   }
 
+  /** Register samples already at a playable rate and level (no normalising, no resampling): the finale's listening clips. */
+  defineBuffer(id: string, data: Float32Array, fs: number, t0: number, gain = 1): ClipInfo {
+    const info: ClipInfo = { id, duration: data.length / fs, t0, speed: 1 };
+    this.buffers.delete(id);
+    this.define(info, { kind: 'samples', data, fs }, gain);
+    if (this.ctx) void this.load(id);
+    return info;
+  }
+
   info(id: string): ClipInfo | undefined {
     return this.schedule.info(id);
   }

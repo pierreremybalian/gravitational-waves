@@ -15,6 +15,7 @@ How to build a stage scene for Gravitational Waves. Read `HANDOFF.md` (story, fi
 - The same values are TSL uniforms in `ctx.globals`: `uChirpT`, `uChirpProgress`, `uChirpPlaying`, `uChirpSinceEnd`, `uAudible`.
 - Never time the chirp with `elapsed`. With sound off the transport still runs silently over the same schedule, so the picture moves the same way. The playhead is within one frame of the sound at the ear (`scripts/audio-check.ts`).
 - Clips (`src/data/gw150914.json` → `clips`; all 2.000 s, `t0` = −1.5 s, 16384 Hz WAV): `chirp-H1`, `chirp-L1` (both on H1's clock: L1's merger sits at t = −7.1 ms, and L1 is not inverted), `chirp-H1-x4` (pitch ×4, same timing; say so on screen), `chirp-template`, `chirp-template-x4` (best-fit model, no noise: modelled).
+- Looping slowed clips (stages 4–6): `clipClock(ctx.chirp, spec, out)` (`src/shared/space/clock.ts`) is the only source of the binary's time. The scroll never sets it (camera and caption beats only); before the clip starts the picture holds the clip's first moment, dimmed. Sound and picture fade together at the loop seam (`seamGain`, `SEAM_FADE`, `LOOP_GAP` in `src/script/slow.ts`). The HUD card `src/hud/cards/chirp-timeline.astro` shows the window, the merger and the playhead. `node scripts/clock-check.ts` asserts it on the full page.
 - Direct control (catalogue, buttons): `transport.play(clipId, { loop? })` cuts and plays now; `transport.stop()`; `transport.defineSamples(id, Float32Array, fs, t0)` registers a catalogue snippet (`eventClipId(name, det)`, data from `loadSnippet(ev)` in `src/shared/gwdata.ts`). The conductor only passes on changes of the stage's own `sound(local)`, so a direct `play()` stands until then.
 - Reduced motion: `$reducedMotion` with `ctx.chirp.audible` false → the engine holds one frame; with sound on it renders every frame: keep the playhead (colour/opacity), drop camera drift and scale pulses.
 
@@ -60,5 +61,5 @@ Efficiency (owner request): shoot only when it changes a decision. Several local
 
 - `node scripts/shoot.ts --scene <id> --locals 0.05,0.3,0.6,0.95 --outdir scratch/shots/<id>` and Read the PNGs (the transport runs silently in the harness; add `--wait` to let the chirp play).
 - Full page with narration and HUD: `node scripts/shoot.ts --stage <id> --at 0.3,0.7 --wait 3500`; `--webgl` for the fallback; `--width 390 --height 844` for phones; `--leak` for load/unload.
-- Sound and sync: `node scripts/audio-check.ts` must stay green.
+- Sound and sync: `node scripts/audio-check.ts` and `node scripts/clock-check.ts` must stay green.
 - `pnpm test`, `pnpm check`, `pnpm lint` before you finish.
