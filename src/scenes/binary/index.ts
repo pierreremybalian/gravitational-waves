@@ -133,7 +133,7 @@ export default function binaryScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local);
-      pose.tx = 0;
+      pose.tx = rig.camera.aspect > 1 ? -12 : 0;
       pose.tt = -2;
       pose.ty = 0;
       rig.apply(pose, elapsed);

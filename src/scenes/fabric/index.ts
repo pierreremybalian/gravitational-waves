@@ -162,7 +162,7 @@ export default function fabricScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local);
-      pose.tx = 0;
+      pose.tx = rig.camera.aspect > 1 ? -3.2 : 0;
       pose.tt = -1.2;
       pose.ty = 0;
       rig.apply(pose, elapsed);

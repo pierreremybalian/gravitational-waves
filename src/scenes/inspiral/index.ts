@@ -144,7 +144,7 @@ export default function inspiralScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local);
-      pose.tx = 0;
+      pose.tx = rig.camera.aspect > 1 ? -8 : 0;
       pose.tt = 1;
       pose.ty = -4;
       rig.apply(pose, elapsed);

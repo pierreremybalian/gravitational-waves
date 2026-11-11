@@ -16,6 +16,7 @@ import { GW150914, loadSeries } from '../../shared/gwdata.ts';
 import { LIGO_ARM } from '../../gw/units.ts';
 import { SIZES, scale, scaleZoom } from '../../script/scale.ts';
 import { sci } from '../../script/fmt.ts';
+import { supHtml } from '../../lib/sup.ts';
 import { track } from '../../time/tracks.ts';
 
 const params = {
@@ -79,7 +80,7 @@ const NAMES: Record<string, string> = {
   nucleus: `Its nucleus: about ${(SIZES.nucleus * 1e15).toFixed(0)} fm`,
   proton: `A proton: ${(SIZES.proton * 1e15).toFixed(2)} fm`,
   rest: 'Mirror at rest',
-  surface: `Moved by the wave: ${sci(SIZES.shift)} m at h = 10<sup>−21</sup>`,
+  surface: supHtml(`Moved by the wave: ${sci(SIZES.shift)} m at h = 10⁻²¹`),
 };
 
 /** Where each label sits, in the item's own units (before its origin offset). */
@@ -123,6 +124,7 @@ export default function scaleScene(): BlockScene {
     tone: it.id === 'surface' || it.id === 'arms' ? 'a' : 'plain',
     side: it.id === 'rest' ? 'below' : it.id === 'surface' ? 'above' : 'right',
     size: 'sm',
+    keepCase: it.id === 'surface' ? true : undefined,
   }));
   specs.push({ id: 'frame', text: '', tone: 'mute', side: 'below', size: 'sm' });
   const labels = new LabelSet(specs);
@@ -180,8 +182,8 @@ export default function scaleScene(): BlockScene {
 
       pose.az = params.az(local);
       pose.el = params.el(local);
-      pose.dist = params.dist;
-      pose.tx = 0;
+      pose.dist = params.dist * (rig.camera.aspect < 1 ? 1.15 : 1);
+      pose.tx = rig.camera.aspect > 1 ? -2.4 : 0;
       pose.tt = 0;
       pose.ty = 0;
       rig.apply(pose, elapsed);

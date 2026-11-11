@@ -38,7 +38,7 @@ const params = {
     [1, 18.5],
   ]),
   /** Ribbon width on screen, world units. */
-  width: 15,
+  width: 12,
   /** World units per σ of whitened strain. */
   yPerSigma: 0.2,
   gap: 1.45,
@@ -63,8 +63,8 @@ export default function soundScene(): BlockScene {
   let strain: Float32Array;
   const w = GW150914.window;
   const labels = new LabelSet([
-    { id: 'h1', text: 'Hanford, Washington', tone: 'a', side: 'left', size: 'sm' },
-    { id: 'l1', text: 'Livingston, Louisiana', tone: 'b', side: 'left', size: 'sm' },
+    { id: 'h1', text: 'Hanford, Washington', tone: 'a', side: 'right', size: 'sm' },
+    { id: 'l1', text: 'Livingston, Louisiana', tone: 'b', side: 'right', size: 'sm' },
     { id: 'merger', text: 'Merger', tone: 'plain', side: 'above', size: 'sm' },
     { id: 'chirp', text: 'The chirp: 0.2 s', tone: 'warm', side: 'below', size: 'sm' },
     { id: 'model', text: 'Best-fit model (white)', tone: 'both', side: 'right', size: 'sm' },
@@ -147,12 +147,13 @@ export default function soundScene(): BlockScene {
       const t0 = T_FROM + (params.zoom[0] - T_FROM) * z;
       const t1 = T_TO + (params.zoom[1] - T_TO) * z;
       const centre = (t0 + t1) / 2;
-      const xs = params.width / (t1 - t0);
+      const width = rig.camera.aspect < 1 ? params.width * 0.55 : params.width;
+      const xs = width / (t1 - t0);
       const intro = Math.min(1, local / 0.1);
       for (const r of [h1, l1, model]) {
         r.centre.value = centre;
         r.xScale.value = xs;
-        r.half.value = params.width / 2;
+        r.half.value = width / 2;
         r.play.value = t;
         r.headWidth.value = 0.0035 + 0.006 * (1 - z);
       }
@@ -167,7 +168,7 @@ export default function soundScene(): BlockScene {
 
       // Playhead line across both ribbons, a bead on each trace (brightness follows loudness).
       const x = xOf(t);
-      const inView = Math.abs(x) <= params.width / 2 ? 1 : 0;
+      const inView = Math.abs(x) <= width / 2 ? 1 : 0;
       const ph = marks.state[PLAYHEAD]!;
       ph.x = x;
       ph.sy = params.gap / 2 + 1.1;
@@ -188,7 +189,7 @@ export default function soundScene(): BlockScene {
       br.sy = -1.5;
       br.intensity = intro * Math.min(1, z * 1.5);
       const ax = marks.state[AXIS]!;
-      ax.sx = params.width / 2;
+      ax.sx = width / 2;
       ax.y = -params.gap / 2 - 1.3;
       ax.intensity = intro;
       marks.commit();
@@ -202,18 +203,19 @@ export default function soundScene(): BlockScene {
       pose.az = params.az(local);
       pose.el = params.el(local);
       pose.dist = params.dist(local);
-      pose.tx = -1.4 - 1.6 * hero;
+      // Desktop: captions sit bottom-left, so the instrument sits right of centre (more so under the hero title).
+      pose.tx = rig.camera.aspect > 1 ? -2.6 - 1.4 * hero : 0;
       pose.tt = 0;
       pose.ty = 0;
       rig.apply(pose, elapsed);
       rig.camera.updateMatrixWorld();
 
       const lo = intro;
-      labels.place(L.h1, -params.width / 2, params.gap / 2, 0, rig.camera, lo * (onL1 ? 0.6 : 1));
-      labels.place(L.l1, -params.width / 2, -params.gap / 2, 0, rig.camera, lo * (onL1 ? 1 : 0.6));
+      labels.place(L.h1, -width / 2, params.gap / 2 + 0.75, 0, rig.camera, lo * (onL1 ? 0.6 : 1));
+      labels.place(L.l1, -width / 2, -params.gap / 2 + 0.6, 0, rig.camera, lo * (onL1 ? 1 : 0.6));
       labels.place(L.merger, xOf(0), params.gap / 2 + 1.0, 0, rig.camera, lo * 0.85);
       labels.place(L.chirp, xOf(-0.1), -params.gap / 2 - 1.15, 0, rig.camera, lo * br.intensity);
-      labels.place(L.model, params.width / 2, params.gap / 2 + 0.3, 0, rig.camera, m * lo);
+      labels.place(L.model, width / 2, params.gap / 2 + 0.3, 0, rig.camera, m * lo);
     },
     render(target: RenderTarget) {
       renderer.setRenderTarget(target);
