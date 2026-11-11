@@ -53,6 +53,9 @@ const headers = `/*${noindex}
 
 /stills/*
   Cache-Control: public, max-age=86400
+
+/data/*
+  Cache-Control: public, max-age=86400
 `;
 writeFileSync(join(dist, '_headers'), headers);
 console.log(`Wrote dist/_headers (${hashes.size} script hashes${noindex ? ', noindex preview' : ''}).`);

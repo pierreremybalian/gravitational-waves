@@ -65,12 +65,13 @@ const titles = chapters.map((ch) => ch.data.title);
 
   <header class="hero" data-hero>
     <p class="hero-kicker">
-      <span>{CHAPTERS.length} stages</span><span>Rhythm</span><span>Harmony</span><span>Live sound</span>
+      <span>{CHAPTERS.length} stages</span><span>GW150914</span><span>Real data</span><span>Real sound</span>
     </p>
     <h1>{SITE.name}</h1>
     <p class="hero-lede">
-      Three beats against two. Loops of three and four that drift apart and meet again. What polyrhythm and polymeter really
-      are, why they are different, and how a rhythm played fast enough becomes a chord. Then build your own.
+      On 14 September 2015 two detectors in the United States heard two black holes collide 1.3 billion light years away.
+      What a gravitational wave is, how LIGO measured a stretch a thousand times smaller than a proton, and how the signal was
+      pulled out of the noise. Hear the real chirp, then every merger found since.
     </p>
     <p class="hero-sound"><button type="button" class="sound-cta" data-sound-cta>Turn sound on</button> <span>Best with headphones. You can turn it off any time (<kbd>M</kbd>).</span></p>
     <p class="hero-hint" aria-hidden="true"><span></span>Scroll to begin</p>
@@ -108,9 +109,10 @@ const titles = chapters.map((ch) => ch.data.title);
     <div class="credits-inner">
       <h2 id="credits-h">About this explanation</h2>
       <p class="lede">
-        Every sound is synthesized in your browser from the same numbers that draw the picture, and every flash on screen is
-        timed to the moment its sound reaches you. Where a drawing is a way of picturing a ratio rather than something literal,
-        the stage says so; the counts and ratios in the corner are always exact.
+        The sounds are the detectors’ own data: LIGO’s strain recordings, whitened and band-passed, played at their real speed
+        (and, where a stage says so, raised in pitch for small speakers). Every number on screen comes from the public data
+        release or from the physics it is computed with, and the picture is locked to the moment you hear it. Where a drawing
+        is a model or a metaphor rather than a measurement, the stage says so; exaggerations are stated.
       </p>
       <h3>Stage by stage: the longer story and how we know</h3>
       <div class="stages">
@@ -176,14 +178,14 @@ const titles = chapters.map((ch) => ch.data.title);
       <p class="fine">
         Keyboard: ↑ ↓ / Page Up / Page Down step through the story one caption at a time; Home and End jump to the start and the
         end. Rendering quality adapts to your device automatically. Press <kbd>M</kbd> to turn sound on or off. Companion pieces:
-        <a href={SITE.cosmicHistory}>Cosmic History</a>, <a href={SITE.blockUniverse}>Block Universe</a> and
-        <a href={SITE.tideMachine}>Tide Machine</a>.
+        <a href={SITE.cosmicHistory}>Cosmic History</a>, <a href={SITE.blockUniverse}>Block Universe</a>,
+        <a href={SITE.tideMachine}>Tide Machine</a> and <a href={SITE.crossRhythm}>Cross Rhythm</a>.
       </p>
     </div>
   </footer>
 
   <noscript>
-    <p class="noscript">This explanation plays its rhythms with the Web Audio API and draws them with WebGPU or WebGL, so it needs JavaScript. The story text above still reads in order.</p>
+    <p class="noscript">This explanation plays LIGO’s recordings with the Web Audio API and draws them with WebGPU or WebGL, so it needs JavaScript. The story text above still reads in order.</p>
   </noscript>
 </Base>
 
@@ -346,7 +348,7 @@ const titles = chapters.map((ch) => ch.data.title);
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: #120a02;
-    background: var(--color-l0);
+    background: var(--color-h1);
     border: 0;
     border-radius: 999px;
     cursor: pointer;
@@ -473,54 +475,6 @@ const titles = chapters.map((ch) => ch.data.title);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--st);
-  }
-  .evidence {
-    margin-top: 0.9rem;
-    display: grid;
-    gap: 1.1rem;
-    border-left: 1px solid var(--color-line);
-    padding-left: 1.1rem;
-  }
-  .ev-head {
-    display: flex;
-    gap: 0.8rem;
-    align-items: baseline;
-  }
-  .ev-year {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--color-glow);
-  }
-  .ev-name {
-    font-family: var(--font-serif);
-    font-size: 1.12rem;
-    color: var(--color-paper);
-  }
-  .ev-tested {
-    margin-top: 0.25rem;
-    font-size: 0.9rem;
-    line-height: 1.55;
-  }
-  .ev-result {
-    margin-top: 0.25rem;
-    font-size: 0.9rem;
-    line-height: 1.55;
-    color: var(--color-st-measured);
-  }
-  .ev-src {
-    margin-top: 0.3rem;
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-  .positions [data-camp='block'] .ev-year {
-    color: var(--color-st-argument);
-  }
-  .positions [data-camp='growing'] .ev-year,
-  .positions [data-camp='presentism'] .ev-year {
-    color: var(--color-st-open);
-  }
-  .positions [data-camp='neutral'] .ev-year {
-    color: var(--color-st-exact);
   }
   .credit-list {
     margin-top: 0.9rem;

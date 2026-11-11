@@ -6,7 +6,7 @@ import type { QualityTier } from '../render/quality.ts';
 import type { AssetLoader } from '../render/assets.ts';
 import type { Status } from '../time/stages.ts';
 import type { LabelSet } from '../shared/gfx/labels.ts';
-import type { MusicFrame } from '../rhythm/frame.ts';
+import type { ChirpFrame } from '../audio/schedule.ts';
 
 export type { Status };
 
@@ -15,8 +15,8 @@ export interface RenderContext {
   globals: GlobalUniforms;
   quality: QualityTier;
   assets: AssetLoader;
-  /** The music at the listener's ear this frame (filled before update()). Read it; never time beats yourself. */
-  music: Readonly<MusicFrame>;
+  /** The chirp at the listener's ear this frame (filled before update()). Read it; never time the chirp yourself. */
+  chirp: Readonly<ChirpFrame>;
 }
 
 export interface BlockScene {
@@ -25,7 +25,7 @@ export interface BlockScene {
   /** One sentence: what kind of claim this is and anything exaggerated. Shown on the stage's intro card. */
   statusNote: string;
   init(ctx: RenderContext): Promise<void>;
-  /** local: 0–1 progress through this scene's stage. elapsed: wall-clock seconds for idle motion (never for rhythm). */
+  /** local: 0–1 progress through this scene's stage. elapsed: wall-clock seconds for idle motion (never for the chirp). */
   update(local: number, dt: number, elapsed: number): void;
   render(target: RenderTarget): void;
   resize(width: number, height: number, dpr: number): void;

@@ -61,12 +61,13 @@ const analytics = import.meta.env.PROD && !noindex;
       image: og.toString(),
       inLanguage: 'en',
       about: [
-        { '@type': 'Thing', name: 'Polyrhythm', sameAs: 'https://en.wikipedia.org/wiki/Polyrhythm' },
-        { '@type': 'Thing', name: 'Metre (music)', sameAs: 'https://en.wikipedia.org/wiki/Metre_(music)' },
-        { '@type': 'Thing', name: 'Euclidean rhythm', sameAs: 'https://en.wikipedia.org/wiki/Euclidean_rhythm' },
-        { '@type': 'Thing', name: 'Rhythmicon', sameAs: 'https://en.wikipedia.org/wiki/Rhythmicon' },
+        { '@type': 'Thing', name: 'Gravitational wave', sameAs: 'https://en.wikipedia.org/wiki/Gravitational_wave' },
+        { '@type': 'Event', name: 'GW150914', startDate: '2015-09-14T09:50:45Z', sameAs: 'https://en.wikipedia.org/wiki/First_observation_of_gravitational_waves' },
+        { '@type': 'Organization', name: 'LIGO', sameAs: 'https://en.wikipedia.org/wiki/LIGO' },
+        { '@type': 'Thing', name: 'Binary black hole', sameAs: 'https://en.wikipedia.org/wiki/Binary_black_hole' },
       ],
-      keywords: 'polyrhythm, polymeter, cross-rhythm, three against two, hemiola, Euclidean rhythms, tresillo, bell pattern, Rhythmicon, Henry Cowell, rhythm and pitch, perfect fifth, torus knot, music theory, interactive',
+      isBasedOn: { '@type': 'Dataset', name: 'GWOSC open data: GW150914 strain and the GWTC event catalogue', url: 'https://gwosc.org', license: 'https://creativecommons.org/licenses/by/4.0/', creator: { '@type': 'Organization', name: 'LIGO Scientific Collaboration, Virgo Collaboration and KAGRA' } },
+      keywords: 'gravitational waves, LIGO, GW150914, black hole merger, chirp, interferometer, matched filter, strain, Virgo, KAGRA, GWTC, event catalogue, general relativity, interactive',
       author: { '@type': 'Organization', name: SITE.author },
       publisher: { '@type': 'Organization', name: SITE.author },
     })} />

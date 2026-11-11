@@ -15,19 +15,10 @@ const only = opt('only')?.split(',');
 const webgl = args.includes('--webgl');
 /** Where in each chapter the still is taken (most representative frame). */
 const AT: Record<string, number> = {
-  two: 0.5,
-  cycle: 0.15,
-  grouping: 0.5,
-  axle: 0.36,
-  knot: 0.3,
-  harmony: 0.82,
-  rhythmicon: 0.62,
-  gears: 0.5,
-  long: 0.5,
-  six: 0.8,
-  even: 0.75,
-  ensemble: 0.75,
-  studio: 0.5,
+  sound: 0.5,
+  inspiral: 0.6,
+  merger: 0.5,
+  catalogue: 0.5,
 };
 
 mkdirSync(new URL('../public/stills/', import.meta.url), { recursive: true });
@@ -78,12 +69,12 @@ for (let i = 0; i < CHAPTERS.length; i++) {
   console.log(`stills/${c.id}.webp  ${(webp.length / 1024).toFixed(0)} KB`);
 }
 
-// Open Graph image: the 3 : 2 rings of stage 1 with the title set over it in the site's fonts.
+// Open Graph image: the inspiral stage with the title set over it in the site's fonts.
 if (!only || only.includes('og')) {
   const og = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
   await og.goto(`${base}/?clean=1&tier=high&probe=0${webgl ? '&webgl=1' : ''}`);
   await og.waitForFunction('!!window.__driver && !!window.__engine', null, { timeout: 60000 });
-  const i = CHAPTERS.findIndex((c) => c.id === 'two');
+  const i = CHAPTERS.findIndex((c) => c.id === 'inspiral');
   const p = CHAPTER_STARTS[i]! + (CHAPTER_STARTS[i + 1]! - CHAPTER_STARTS[i]!) * 0.7;
   await og.evaluate(
     (pp) => (window as unknown as { __driver: { scrollToProgress(p: number, o: object): void } }).__driver.scrollToProgress(pp, { immediate: true }),
@@ -95,9 +86,9 @@ if (!only || only.includes('og')) {
     d.style.cssText =
       'position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;justify-content:flex-end;padding:0 0 64px 64px;background:linear-gradient(90deg,rgb(2 2 5/.86),rgb(2 2 5/.55) 34%,rgb(2 2 5/0) 58%);';
     d.innerHTML =
-      '<p style="font:500 13px var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:#ffb35c">13 stages · rhythm · harmony · live sound</p>' +
-      '<h1 style="margin-top:10px;font:300 92px/0.95 var(--font-serif);letter-spacing:-.03em;color:#eef0fa">Cross<br>Rhythm</h1>' +
-      '<p style="margin-top:18px;max-width:430px;font:400 21px/1.4 var(--font-serif);font-style:italic;color:#c9cfe6">Polyrhythm, polymeter, and why a rhythm played fast enough becomes a chord. Then build your own.</p>';
+      '<p style="font:500 13px var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:#ffb35c">13 stages · GW150914 · real data · real sound</p>' +
+      '<h1 style="margin-top:10px;font:300 92px/0.95 var(--font-serif);letter-spacing:-.03em;color:#eef0fa">Gravitational<br>Waves</h1>' +
+      '<p style="margin-top:18px;max-width:430px;font:400 21px/1.4 var(--font-serif);font-style:italic;color:#c9cfe6">Hear two black holes collide, and see how LIGO measured it: then every merger since.</p>';
     document.body.appendChild(d);
   });
   await og.waitForTimeout(400);

@@ -23,21 +23,16 @@
   --color-bowl: #f6d79f;
 
   /* How sure are we. */
-  --color-st-exact: #8fd0ff;
   --color-st-measured: #7cf2c1;
-  --color-st-convention: #ffb3c7;
-  --color-st-tradition: #f2c27a;
-  --color-st-historical: #d8b48a;
+  --color-st-established: #8fd0ff;
+  --color-st-modelled: #f2c27a;
   --color-st-metaphor: #c9a8ff;
 
-  /* Layer colours, in order (mirrored in src/shared/gfx/palette.ts LAYER). */
-  --color-l0: #ffb35c;
-  --color-l1: #5cd0ff;
-  --color-l2: #ff73b0;
-  --color-l3: #b6f26e;
-  --color-l4: #a993ff;
-  --color-l5: #ffe08a;
-  --color-brass: #e6b866;
+  /* Detector colours (mirrored in src/shared/gfx/palette.ts DET). */
+  --color-h1: #ff9e38;
+  --color-l1: #38c7ff;
+  --color-v1: #9e85ff;
+  --color-k1: #a3f54d;
 
   --font-serif: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
   --font-sans: 'Inter Tight Variable', ui-sans-serif, system-ui, sans-serif;
@@ -50,20 +45,14 @@
   color-scheme: dark;
 }
 
-[data-st='exact'] {
-  --st: var(--color-st-exact);
-}
 [data-st='measured'] {
   --st: var(--color-st-measured);
 }
-[data-st='convention'] {
-  --st: var(--color-st-convention);
+[data-st='established'] {
+  --st: var(--color-st-established);
 }
-[data-st='tradition'] {
-  --st: var(--color-st-tradition);
-}
-[data-st='historical'] {
-  --st: var(--color-st-historical);
+[data-st='modelled'] {
+  --st: var(--color-st-modelled);
 }
 [data-st='metaphor'] {
   --st: var(--color-st-metaphor);

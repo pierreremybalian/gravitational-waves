@@ -1,12 +1,12 @@
 // Site-wide copy and SEO.
 export const SITE = {
-  name: 'Cross Rhythm',
-  url: 'https://cross-rhythm.balian.dev',
-  title: 'Cross Rhythm — Polyrhythm, polymeter, and why rhythm turns into harmony',
+  name: 'Gravitational Waves',
+  url: 'https://gravitational-waves.balian.dev',
+  title: 'Gravitational Waves — Hear LIGO’s first black hole collision, and every merger since',
   description:
-    'Hear three against two, then see it: rings on one axle, gears that share a beat, a knot that closes every bar. Speed a rhythm up until it becomes a chord, then build your own on a playable instrument.',
+    'In 2015 LIGO heard two black holes collide 1.3 billion light years away. Hear the real chirp, see how a stretch a thousand times smaller than a proton was measured and pulled out of the noise, then explore every confirmed merger.',
   ogImage: '/og.jpg',
-  ogImageAlt: 'Cross Rhythm: glowing rings of three and two beats turning on one axle around a sweeping hand.',
+  ogImageAlt: 'Gravitational Waves: two black holes spiralling together while the real LIGO chirp rises across a glowing waveform.',
   themeColor: '#04030a',
   author: 'Balian Design',
   /** Google Analytics 4 (the balian.dev property). Loaded in production builds only. */
@@ -15,44 +15,45 @@ export const SITE = {
   cosmicHistory: 'https://cosmic-history.balian.dev',
   blockUniverse: 'https://block-universe.balian.dev',
   tideMachine: 'https://tide-machine.balian.dev',
+  crossRhythm: 'https://cross-rhythm.balian.dev',
 };
 
 export const STATUS_LABEL = {
-  exact: 'Exact',
   measured: 'Measured',
-  convention: 'Convention',
-  tradition: 'Tradition',
-  historical: 'Historical',
+  established: 'Established',
+  modelled: 'Modelled',
   metaphor: 'Metaphor',
 } as const;
 
 export const STATUS_HELP = {
-  exact: 'Follows from arithmetic: ratios, least common multiples, even spacing. The sound is generated from the same numbers.',
-  measured: 'From experiments on how people hear and tap rhythm; the numbers are typical values with real spread between listeners.',
-  convention: 'How musicians name and write it down; usage varies between traditions and teachers.',
-  tradition: 'Where this lives in real music. Our version is a simplified model of a living practice, not a transcription.',
-  historical: 'Documented history of instruments and ideas.',
+  measured:
+    'Straight from the detectors’ public data or the published analysis of it: the recordings, the noise, the timing, the fitted masses and distances, with their uncertainties.',
+  established:
+    'Textbook physics tested many times over: general relativity’s description of gravity and waves, and how an interferometer works.',
+  modelled:
+    'Computed from a model fitted to the data (a numerical-relativity or effective-one-body waveform, an orbit from Kepler’s law). It matches the measurement but is not the measurement itself.',
   metaphor: 'A picture to help intuition; it claims nothing literal.',
 } as const;
 
 export const CREDITS: { label: string; text: string; url?: string }[] = [
   {
-    label: 'Even rhythms',
-    text: 'Godfried Toussaint (2005), The Euclidean Algorithm Generates Traditional Musical Rhythms, Proceedings of BRIDGES; E. Bjorklund’s spacing algorithm.',
-    url: 'https://cgm.cs.mcgill.ca/~godfried/publications/banff.pdf',
+    label: 'Data',
+    text: 'LIGO Scientific Collaboration, Virgo Collaboration and KAGRA, Gravitational Wave Open Science Center (GWOSC), CC BY 4.0: GW150914 strain from LIGO Hanford and Livingston, the best-fit and numerical-relativity waveforms published with it, and the GWTC event catalogue.',
+    url: 'https://gwosc.org',
   },
   {
-    label: 'Hearing in time',
-    text: 'Justin London (2012), Hearing in Time: Psychological Aspects of Musical Meter, 2nd ed., Oxford University Press.',
+    label: 'The detection',
+    text: 'B. P. Abbott et al. (LIGO Scientific Collaboration and Virgo Collaboration) (2016), Observation of Gravitational Waves from a Binary Black Hole Merger, Physical Review Letters 116, 061102.',
+    url: 'https://doi.org/10.1103/PhysRevLett.116.061102',
   },
   {
-    label: 'Shapes view',
-    text: 'Inspired by MUSEONG’s “Poly Rhythms” video, which draws each rhythm as a polygon traced by a moving dot.',
-    url: 'https://www.youtube.com/watch?v=Lxs4cvSximc',
+    label: 'Signal processing',
+    text: 'Whitening, band-pass and matched filtering follow GWOSC’s GW150914 tutorial; LIGO Scientific Collaboration and Virgo Collaboration (2020), A guide to LIGO–Virgo detector noise and extraction of transient gravitational-wave signals, Classical and Quantum Gravity 37, 055002.',
+    url: 'https://doi.org/10.1088/1361-6382/ab685e',
   },
   {
     label: 'Sound',
-    text: 'Every sound is synthesized in your browser with the Web Audio API; no recordings are used.',
+    text: 'The chirps are the detectors’ whitened, band-passed strain played at its real speed; where a stage says “pitch raised”, every frequency is multiplied by four with the timing unchanged, so small speakers can play it.',
   },
   {
     label: 'Rendering',

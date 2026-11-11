@@ -1,0 +1,219 @@
+---
+// Listening bench (dev only): hear the GW150914 clips (real, pitch-raised, template) and catalogue events through the
+// transport, with a waveform and the scene-facing playhead drawn from transport.frame(), so sound and picture can be
+// compared by ear and eye. ?audiolog=1 exposes window.__sync / __transport for scripts/audio-check.ts.
+import Base from '../layouts/Base.astro';
+import gw from '../data/gw150914.json';
+const clips = Object.entries(gw.clips).map(([id, c]) => ({ id, ...c }));
+---
+
+<Base title="Listen: GW150914 and the catalogue" noindex>
+  <main class="bench">
+    <h1>Listen</h1>
+    <p class="row">
+      <button type="button" data-sound>Sound on</button>
+      <button type="button" data-stop>Stop</button>
+      <label><input type="checkbox" data-loop /> loop</label>
+    </p>
+    <h2>GW150914</h2>
+    <ul class="clips">
+      {
+        clips.map((c) => (
+          <li>
+            <button type="button" data-clip={c.id} data-series={c.id.includes('template') ? 'fit-white-H1' : c.id.includes('L1') ? 'white-L1' : 'white-H1'}>
+              {c.id}
+            </button>
+            <span class="kind" data-kind={c.kind}>
+              {c.kind}
+            </span>
+            <span>{c.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <h2>Catalogue</h2>
+    <ul class="clips" data-events>
+      <li>loading…</li>
+    </ul>
+    <canvas data-wave width="1200" height="260"></canvas>
+    <pre data-frame>…</pre>
+  </main>
+</Base>
+
+<script>
+  import { transport } from '../audio/transport.ts';
+  import { $sound } from '../state/sound.ts';
+  import { GW150914, eventClipId, loadCatalog, loadSeries, loadSnippet, median, seriesTime, type CatalogEvent, type SeriesName } from '../shared/gwdata.ts';
+
+  const w = window as unknown as Record<string, unknown>;
+  w.__transport = transport;
+  const soundBtn = document.querySelector<HTMLButtonElement>('[data-sound]')!;
+  soundBtn.addEventListener('click', () => ($sound.get() === 'on' ? transport.disableSound() : transport.enableSound()));
+  $sound.subscribe((s) => {
+    soundBtn.textContent = s === 'on' ? 'Sound off' : `Sound on (${s})`;
+    soundBtn.dataset.state = s;
+  });
+  document.querySelector('[data-stop]')!.addEventListener('click', () => transport.stop());
+  const loop = document.querySelector<HTMLInputElement>('[data-loop]')!;
+
+  // What the canvas draws: samples + their time axis (data seconds).
+  let wave: { data: Float32Array; t0: number; fs: number } | null = null;
+
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-clip]')) {
+    b.addEventListener('click', async () => {
+      transport.play(b.dataset.clip!, { loop: loop.checked });
+      const data = await loadSeries(b.dataset.series as SeriesName);
+      wave = { data, t0: GW150914.window.t0, fs: GW150914.window.fs };
+    });
+  }
+
+  // A few catalogue events: the first, the loudest, the heaviest, the neutron stars, the lightest-heavy.
+  const list = document.querySelector<HTMLElement>('[data-events]')!;
+  void loadCatalog().then((cat) => {
+    const evs = cat.events.filter((e) => e.snippet);
+    const by = (k: (e: CatalogEvent) => number) => evs.reduce((a, b) => (k(b) > k(a) ? b : a));
+    const pick = new Map<string, CatalogEvent>();
+    const add = (why: string, e: CatalogEvent | undefined) => e && !pick.has(e.name) && pick.set(e.name, Object.assign(e, { why }));
+    add('first detection', evs.find((e) => e.name === 'GW150914'));
+    add('neutron stars + light', evs.find((e) => e.name === 'GW170817'));
+    add('loudest', by((e) => median(e.snr) ?? 0));
+    add('heaviest', by((e) => median(e.mFinal) ?? median(e.mTotal) ?? 0));
+    add('neutron star + black hole', evs.find((e) => e.type === 'NSBH'));
+    add('most distant', by((e) => median(e.distance) ?? 0));
+    list.innerHTML = '';
+    for (const e of pick.values()) {
+      const li = document.createElement('li');
+      const info = document.createElement('span');
+      const m1 = median(e.m1);
+      const m2 = median(e.m2);
+      info.textContent = `${(e as CatalogEvent & { why: string }).why}: ${e.name} · ${e.type ?? '?'} · ${m1 ?? '?'} + ${m2 ?? '?'} M☉ · ${median(e.distance) ?? '?'} Mpc · SNR ${median(e.snr)}`;
+      li.append(info);
+      for (const d of e.snippet!.detectors) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = d;
+        btn.dataset.event = e.name;
+        btn.addEventListener('click', async () => {
+          const snip = await loadSnippet(e);
+          const id = eventClipId(e.name, d);
+          if (!transport.info(id)) transport.defineSamples(id, snip[d]!, e.snippet!.fs, e.snippet!.t0);
+          transport.play(id, { loop: loop.checked });
+          wave = { data: snip[d]!, t0: e.snippet!.t0, fs: e.snippet!.fs };
+        });
+        li.append(btn);
+      }
+      list.append(li);
+    }
+  });
+
+  // Draw: the waveform of the clip's data window, the clip's span, and the playhead at frame.t.
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-wave]')!;
+  const g = canvas.getContext('2d')!;
+  const pre = document.querySelector<HTMLElement>('[data-frame]')!;
+  const draw = () => {
+    const f = transport.frame(performance.now());
+    const W = canvas.width;
+    const H = canvas.height;
+    g.fillStyle = '#05040c';
+    g.fillRect(0, 0, W, H);
+    const info = f.clip ? transport.info(f.clip) : undefined;
+    if (wave && info) {
+      const a = info.t0;
+      const b = info.t0 + info.duration * info.speed;
+      const x = (t: number) => ((t - a) / (b - a)) * W;
+      let peak = 0;
+      for (let i = 0; i < wave.data.length; i++) peak = Math.max(peak, Math.abs(wave.data[i]!));
+      g.strokeStyle = '#ffb35c';
+      g.lineWidth = 1;
+      g.beginPath();
+      const i0 = Math.max(0, Math.floor((a - wave.t0) * wave.fs));
+      const i1 = Math.min(wave.data.length, Math.ceil((b - wave.t0) * wave.fs));
+      for (let i = i0; i < i1; i++) {
+        const t = wave.t0 + i / wave.fs;
+        const y = H / 2 - (wave.data[i]! / peak) * (H / 2 - 10);
+        if (i === i0) g.moveTo(x(t), y);
+        else g.lineTo(x(t), y);
+      }
+      g.stroke();
+      g.strokeStyle = '#ffffff55';
+      g.beginPath();
+      g.moveTo(x(0), 0);
+      g.lineTo(x(0), H);
+      g.stroke();
+      g.strokeStyle = f.playing ? '#5cd0ff' : '#5cd0ff55';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(x(f.t), 0);
+      g.lineTo(x(f.t), H);
+      g.stroke();
+    }
+    pre.textContent = `clip ${f.clip}  playing ${f.playing}  t ${f.t.toFixed(4)} s  pos ${f.pos.toFixed(3)}  progress ${f.progress.toFixed(3)}  audible ${f.audible}  instance ${f.instance}  T ${f.T.toFixed(3)}  seriesTime(0) ${seriesTime(0).toFixed(4)}`;
+    requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
+  w.__ready = true;
+</script>
+
+<style>
+  .bench {
+    max-width: 75rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    font-family: var(--font-sans);
+    color: var(--color-fog);
+  }
+  h1,
+  h2 {
+    font-family: var(--font-serif);
+    color: var(--color-paper);
+    margin: 1rem 0 0.5rem;
+  }
+  .row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  .clips {
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .clips li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #ffffff40;
+    border-radius: 4px;
+    color: var(--color-paper);
+  }
+  button:hover {
+    border-color: var(--color-h1);
+  }
+  .kind {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
+  [data-kind='measured'] {
+    color: var(--color-st-measured);
+  }
+  [data-kind='modelled'] {
+    color: var(--color-st-modelled);
+  }
+  canvas {
+    width: 100%;
+    margin-top: 1rem;
+    border: 1px solid #ffffff20;
+  }
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+  }
+</style>

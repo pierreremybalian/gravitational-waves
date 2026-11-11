@@ -1,0 +1,153 @@
+{
+  "event": "GW150914",
+  "credit": "LIGO Scientific Collaboration and Virgo Collaboration; Gravitational Wave Open Science Center (gwosc.org), CC BY 4.0",
+  "sources": {
+    "strain": [
+      "https://gwosc.org/eventapi/json/GWTC-1-confident/GW150914/v3/H-H1_GWOSC_4KHZ_R1-1126259447-32.hdf5",
+      "https://gwosc.org/eventapi/json/GWTC-1-confident/GW150914/v3/L-L1_GWOSC_4KHZ_R1-1126259447-32.hdf5"
+    ],
+    "template": "https://gwosc.org/s/events/GW150914/GW150914_4_template.hdf5",
+    "nr": "https://gwosc.org/s/events/GW150914/GW150914_4_NR_waveform.txt",
+    "prl": "https://gwosc.org/s/events/GW150914/P150914/"
+  },
+  "gpsStart": 1126259447.0,
+  "gpsMerger": 1126259462.423686,
+  "fs": 4096,
+  "window": {
+    "t0": -2.0001021001650603,
+    "n": 12288,
+    "fs": 4096,
+    "note": "t = seconds from the H1 merger (template peak)"
+  },
+  "series": {
+    "raw-H1": "raw strain, H1",
+    "raw-L1": "raw strain, L1",
+    "white-H1": "whitened, band-passed 35–350 Hz, in units of the noise σ",
+    "white-L1": "whitened, band-passed 35–350 Hz, in units of the noise σ (not shifted, not inverted)",
+    "fit-white-H1": "best-fit template whitened and band-passed like white-H1",
+    "fit-white-L1": "best-fit template whitened and band-passed like white-L1",
+    "bandpass-H1": "strain ×1e21, band-passed 35–350 Hz and notched at the instrumental lines (PRL fig. 1 style)",
+    "bandpass-L1": "strain ×1e21, band-passed and notched like bandpass-H1",
+    "snr-H1": "matched-filter SNR, H1",
+    "snr-L1": "matched-filter SNR, L1",
+    "snr-net": "network SNR, sqrt(H1² + L1²) with L1 shifted by dtL1",
+    "template-strain-H1": "best-fit template at Hanford, physical strain ×1e21",
+    "template-amp": "its amplitude envelope |h+ + i h×| ×1e21",
+    "template-freq": "its gravitational-wave frequency, Hz (orbital frequency = half)",
+    "template-phase": "its gravitational-wave phase, rad, 0 at the merger (orbital phase = half)"
+  },
+  "asd": {
+    "f0": 10.0,
+    "df": 0.25,
+    "n": 7961,
+    "unit": "strain/√Hz"
+  },
+  "nr": {
+    "t0": -0.620849609375,
+    "fs": 4096.0,
+    "n": 2769,
+    "unit": "strain ×1e21"
+  },
+  "template": {
+    "a1": 0.355,
+    "a2": -0.769,
+    "approx": "lalsim.SEOBNRv2",
+    "eventname": "GW150914",
+    "fmin": 6.301923525952596,
+    "fs": 4096,
+    "m1": 41.743,
+    "m2": 29.237,
+    "source": "GWOSC GW150914 tutorial template (detector-frame masses)"
+  },
+  "snr": {
+    "H1": 19.5143438958251,
+    "L1": 13.714769383482468,
+    "network": 23.85171937044863
+  },
+  "offset": {
+    "dtL1": -0.007092440631245367,
+    "dtL1_xcorr": -0.007280234565473549,
+    "sign": -1,
+    "note": "dtL1 = L1 merger time − H1 merger time (s); negative: Livingston first. sign −1: L1 inverted."
+  },
+  "fit": {
+    "H1": {
+      "coef": [
+        -0.0007731549396152729,
+        -0.0010413754996804008
+      ],
+      "corr": 0.8039638268701667
+    },
+    "L1": {
+      "coef": [
+        0.0008032901359595662,
+        0.0006861142152941257
+      ],
+      "corr": 0.715040020861396
+    }
+  },
+  "validation": {
+    "bandpassed H1 vs PRL fig1 observed H1": 0.9909673910266983,
+    "whitened H1 vs PRL fig1 observed H1": 0.9591399272255506,
+    "bandpassed L1 vs PRL fig1 observed L1": 0.5258788104802199,
+    "whitened L1 vs PRL fig1 observed L1": 0.931743050254134,
+    "whitened H1 data vs PRL fig1 NR waveform H1": 0.8284237129645354,
+    "bandpassed H1 data vs PRL fig1 NR waveform H1": 0.8596964131174594,
+    "best-fit template (band-passed) vs PRL fig1 NR waveform H1": 0.9757604850167346,
+    "whitened H1 data vs whitened best-fit template (-0.3..+0.05 s)": 0.8039638268701667,
+    "whitened L1 data vs whitened best-fit template (-0.3..+0.05 s)": 0.715040020861396,
+    "PRL fig2 unfiltered NR peak |h| (1e-21)": 1.2263698655469677,
+    "best-fit template peak |h| at H1 (1e-21)": 1.079244857682699
+  },
+  "clips": {
+    "chirp-H1": {
+      "url": "/data/gw150914/chirp-H1.wav",
+      "duration": 2.0,
+      "t0": -1.5001021001650603,
+      "speed": 1,
+      "pitch": 1,
+      "kind": "measured",
+      "label": "Hanford (H1), whitened and band-passed 35–350 Hz, real time and pitch"
+    },
+    "chirp-L1": {
+      "url": "/data/gw150914/chirp-L1.wav",
+      "duration": 2.0,
+      "t0": -1.5001021001650603,
+      "speed": 1,
+      "pitch": 1,
+      "kind": "measured",
+      "label": "Livingston (L1), whitened and band-passed 35–350 Hz, real time and pitch"
+    },
+    "chirp-H1-x4": {
+      "url": "/data/gw150914/chirp-H1-x4.wav",
+      "duration": 2.0,
+      "t0": -1.5001021001650603,
+      "speed": 1,
+      "pitch": 4,
+      "kind": "measured",
+      "label": "Hanford (H1), whitened; pitch raised ×4 (two octaves) for small speakers, same duration"
+    },
+    "chirp-template": {
+      "url": "/data/gw150914/chirp-template.wav",
+      "duration": 2.0,
+      "t0": -1.5001021001650603,
+      "speed": 1,
+      "pitch": 1,
+      "kind": "modelled",
+      "label": "Best-fit template (SEOBNRv2), whitened like the H1 data: no noise"
+    },
+    "chirp-template-x4": {
+      "url": "/data/gw150914/chirp-template-x4.wav",
+      "duration": 2.0,
+      "t0": -1.5001021001650603,
+      "speed": 1,
+      "pitch": 4,
+      "kind": "modelled",
+      "label": "Best-fit template, pitch raised ×4 (two octaves), same duration"
+    }
+  },
+  "bandpass": [
+    35,
+    350
+  ]
+}

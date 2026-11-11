@@ -22,7 +22,7 @@ const ids = Object.keys(SCENES);
     <label class="row"><input type="checkbox" data-play /> auto-scrub</label>
     <div class="stats" data-stats>…</div>
     <div class="info" data-info></div>
-    <label class="row"><input type="checkbox" data-music /> stage music</label>
+    <label class="row"><input type="checkbox" data-music /> stage sound</label>
     <button type="button" data-sound>Sound on</button>
     <button type="button" data-leak>Load/unload ×50</button>
     <pre data-leak-out></pre>
@@ -49,10 +49,10 @@ const ids = Object.keys(SCENES);
   if (params.get('ui') === '0') document.querySelector<HTMLElement>('[data-ui]')!.style.display = 'none';
   const soundBtn = document.querySelector<HTMLButtonElement>('[data-sound]')!;
   const musicBox = document.querySelector<HTMLInputElement>('[data-music]')!;
-  musicBox.checked = params.get('music') === '1';
+  musicBox.checked = params.get('sound') === '1';
   musicBox.addEventListener('change', () => {
     const u = new URL(location.href);
-    u.searchParams.set('music', musicBox.checked ? '1' : '0');
+    u.searchParams.set('sound', musicBox.checked ? '1' : '0');
     location.href = u.toString();
   });
   soundBtn.addEventListener('click', () => ($sound.get() === 'on' ? transport.disableSound() : transport.enableSound()));

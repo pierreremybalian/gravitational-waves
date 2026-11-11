@@ -1,13 +1,13 @@
-// Luminous lines for the machine (HANDOFF §8.3): the summing wire and the pen's trace. Both render additively after
-// the outline composite. The wire is a camera-facing ribbon rebuilt in place every frame (no allocation); the trace
-// is a ribbon lying on the paper band, built once for the whole run, carried along as the paper feeds and revealed
-// as machine time advances.
+// Glow primitives (from Cross Rhythm / Tide Machine): a camera-facing luminous line rewritten in place every frame (no
+// allocation) and glowing points. Additive, depthWrite off.
 
 import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, Uint32BufferAttribute } from 'three/webgpu';
 import { attribute, cameraPosition, cross, Discard, exp, float, Fn, If, max, mix, modelWorldMatrix, normalize, smoothstep, step, uniform, vec3, vec4, vertexStage } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import type { RGB } from '../gfx/palette.ts';
-import type { FloatU } from './material.ts';
+import type { RGB } from './palette.ts';
+
+const _f = () => uniform(0);
+export type FloatU = ReturnType<typeof _f>;
 
 // ── The wire ───────────────────────────────────────────────────────────────────────────────────────────────────────
 

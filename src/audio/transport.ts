@@ -1,68 +1,67 @@
-// The one musical clock for the page. Transport seconds T run continuously whether or not sound is on:
+// The one clock for the page, and the chirp player. Transport seconds T run continuously whether or not sound is on:
 //  - silent: T = performance.now()/1000 + offS (paused while the tab is hidden);
-//  - audio:  T = audible context time + offA, and an onset at T is started at context time T − offA, so it reaches
-//    the ear exactly when the picture shows it.
-// Switching between the two keeps T (and so the musical position) continuous. The Sequencer (pure) owns tempo,
-// score and onsets; this module only feeds it a horizon and routes its onsets to Web Audio.
+//  - audio:  T = audible context time + offA, and a clip instance starting at T is started at context time T − offA,
+//    so it reaches the ear exactly when the picture shows it.
+// Switching between the two keeps T continuous. The ClipSchedule (pure) decides what plays when; this module feeds it
+// a horizon, turns its instances into AudioBufferSourceNodes and fills the ChirpFrame scenes read every frame.
 
-import { Sequencer, SILENCE, type MusicTarget, type Engine } from '../rhythm/sequencer.ts';
-import { createMusicFrame, fillFrame, type MusicFrame } from '../rhythm/frame.ts';
-import { MAX_LAYERS } from '../rhythm/pattern.ts';
-import type { Entry } from '../rhythm/timeline.ts';
+import gw150914 from '../data/gw150914.json';
 import { $audible, $sound, $syncMs, storeSoundOn, storedSoundOn, storedSyncMs } from '../state/sound.ts';
-import { $sceneStatus } from '../state/store.ts';
 import { AudibleClock } from './clock.ts';
 import { audioContext, pauseShim, unlock } from './context.ts';
-import { loadBank, type Bank } from './bank.ts';
-import { createStream, type Stream } from './stream.ts';
+import { upsample } from './resample.ts';
+import { ClipSchedule, createChirpFrame, type ChirpFrame, type ClipInfo, type Instance, type SoundRequest } from './schedule.ts';
 
-const LOOKAHEAD = 0.12;
-const LOOKAHEAD_BUSY = 0.35;
+const LOOKAHEAD = 0.15;
+/** Fade at a cut, seconds (avoids a click). */
+const CUT_FADE = 0.02;
+/** Playback rate of samples handed over as arrays (catalogue snippets are upsampled to it). */
+const SAMPLES_RATE = 16384;
 
-interface Graph {
-  master: GainNode;
-  limiter: DynamicsCompressorNode;
-  roomSend: GainNode;
-  scale: GainNode[];
-  env: GainNode[];
-  pan: StereoPannerNode[];
+type Source = { kind: 'url'; url: string } | { kind: 'samples'; data: Float32Array; fs: number };
+
+interface Playing {
+  src: AudioBufferSourceNode;
+  gain: GainNode;
 }
 
-export interface OnsetLog {
-  onsets: { T: number; layer: number }[];
-  frames: { perf: number; T: number; age: number[] }[];
+export interface SyncLog {
+  /** Instances as scheduled: transport start/end and the context time the node was started at. */
+  starts: { clip: string; T: number; end: number; ctxStart: number; offset: number }[];
+  /** Per frame; `ear` = unsmoothed context time at the ear (audio mode, else null) and `offA` to map it to T. */
+  frames: { perf: number; T: number; clip: string | null; playing: boolean; t: number; pos: number; ear: number | null; offA: number }[];
   late: number;
 }
 
 class Transport {
-  readonly seq = new Sequencer(0, 0, 0.5);
+  readonly schedule = new ClipSchedule();
   private mode: 'silent' | 'audio' = 'silent';
   private offS = 0;
   private offA = 0;
   private pausedAt: number | null = null;
   private ctx: AudioContext | null = null;
   private clock: AudibleClock | null = null;
-  private graph: Graph | null = null;
-  private bank: Bank | null = null;
-  private stream: Stream | null = null;
+  private master: GainNode | null = null;
   private worker: Worker | null = null;
-  private rr = 0;
-  private lastEntry: Entry | null = null;
+  private readonly sources = new Map<string, Source>();
+  private readonly gains = new Map<string, number>();
+  private readonly buffers = new Map<string, AudioBuffer>();
+  private readonly loading = new Map<string, Promise<AudioBuffer | null>>();
+  private readonly playing = new Map<Instance, Playing>();
+  private readonly pending = new Set<Instance>();
   private lastT = 0;
-  private busyUntil = 0;
   private audibleAt = 0;
-  private frozenPos: number | null = null;
-  private envTarget = new Float32Array(MAX_LAYERS).fill(-1);
-  readonly frameOut: MusicFrame = createMusicFrame();
-  log: OnsetLog | null = null;
-  /** Hits dropped because they would have started late. */
+  readonly frameOut: ChirpFrame = createChirpFrame();
+  log: SyncLog | null = null;
+  /** Instances that could not start on time (buffer not ready); they start late, part-way in. */
   late = 0;
 
   constructor() {
-    this.offS = -performance.now() / 1000;
+    this.offS = typeof performance !== 'undefined' ? -performance.now() / 1000 : 0;
+    for (const [id, c] of Object.entries(gw150914.clips)) this.define({ id, duration: c.duration, t0: c.t0, speed: c.speed }, { kind: 'url', url: c.url });
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('audiolog') === '1') {
-      this.log = { onsets: [], frames: [], late: 0 };
-      (window as unknown as { __sync?: OnsetLog; __transport?: Transport }).__sync = this.log;
+      this.log = { starts: [], frames: [], late: 0 };
+      (window as unknown as { __sync?: SyncLog; __transport?: Transport }).__sync = this.log;
       queueMicrotask(() => ((window as unknown as { __transport?: Transport }).__transport = this));
     }
     $syncMs.set(storedSyncMs());
@@ -75,147 +74,196 @@ class Transport {
     }
   }
 
+  // ── Clips ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  /** Register a clip by URL (WAV/any decodable audio) or by samples. `gain` scales its level (default 1). */
+  define(info: ClipInfo, src: Source, gain = 1): void {
+    this.schedule.define(info);
+    this.sources.set(info.id, src);
+    this.gains.set(info.id, gain);
+  }
+
+  /**
+   * Register samples (e.g. a catalogue snippet at 2048 Hz, any scale): normalised to a 0.89 peak and upsampled to
+   * 16384 Hz for playback. `t0` = data time of the first sample.
+   */
+  defineSamples(id: string, data: Float32Array, fs: number, t0: number, gain = 1): ClipInfo {
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]!));
+    const factor = Math.max(1, Math.round(SAMPLES_RATE / fs));
+    const up = upsample(data, factor);
+    const k = peak > 0 ? 0.89 / peak : 1;
+    for (let i = 0; i < up.length; i++) up[i]! *= k;
+    const info: ClipInfo = { id, duration: up.length / (fs * factor), t0, speed: 1 };
+    this.buffers.delete(id);
+    this.define(info, { kind: 'samples', data: up, fs: fs * factor }, gain);
+    if (this.ctx) void this.load(id);
+    return info;
+  }
+
+  info(id: string): ClipInfo | undefined {
+    return this.schedule.info(id);
+  }
+
+  private load(id: string): Promise<AudioBuffer | null> {
+    const have = this.buffers.get(id);
+    if (have) return Promise.resolve(have);
+    const busy = this.loading.get(id);
+    if (busy) return busy;
+    const ctx = this.ctx;
+    const src = this.sources.get(id);
+    if (!ctx || !src) return Promise.resolve(null);
+    const p = (async () => {
+      try {
+        let buf: AudioBuffer;
+        if (src.kind === 'url') {
+          const res = await fetch(src.url);
+          if (!res.ok) throw new Error(`${res.status} ${src.url}`);
+          buf = await ctx.decodeAudioData(await res.arrayBuffer());
+        } else {
+          buf = ctx.createBuffer(1, src.data.length, src.fs);
+          buf.copyToChannel(src.data as Float32Array<ArrayBuffer>, 0);
+        }
+        this.buffers.set(id, buf);
+        return buf;
+      } catch (err) {
+        console.warn(`[audio] clip ${id} failed to load`, err);
+        return null;
+      } finally {
+        this.loading.delete(id);
+      }
+    })();
+    this.loading.set(id, p);
+    return p;
+  }
+
+  // ── Requests ───────────────────────────────────────────────────────────────────────────────────────────────────
+
   /** Transport seconds at the ear. */
-  now(perfMs: number): number {
+  now(perfMs: number = performance.now()): number {
     if (this.pausedAt !== null) return this.pausedAt;
     if (this.mode === 'audio' && this.clock) return this.clock.now(perfMs) + this.offA;
     return perfMs / 1000 + this.offS;
   }
 
-  request(t: MusicTarget): void {
-    this.seq.request(t);
+  /** What should play (the conductor calls this as the scroll moves). Never cuts a playing clip. */
+  request(r: SoundRequest | null): void {
+    this.schedule.request(r, this.now());
+    if (r && this.ctx) void this.load(r.clip);
   }
 
-  get target(): MusicTarget {
-    return this.seq.current;
+  /** Play a clip now, cutting whatever plays (dev pages, the catalogue). */
+  play(clip: string, opts: Omit<SoundRequest, 'clip'> = {}): void {
+    this.schedule.playNow({ clip, ...opts }, this.now(), this.cancel);
+    if (this.ctx) void this.load(clip);
   }
 
-  /** Dev and stills: hold the music at a fixed musical position (the section restarts at position 0). */
-  freezeAt(pos: number | null): void {
-    this.frozenPos = pos;
-    if (pos !== null) this.seq.reset(0, 0, Math.max(1e-3, this.seq.current.rate));
+  /** Stop now (fade of 20 ms). */
+  stop(): void {
+    this.schedule.cut(this.now(), this.cancel);
   }
 
-  /** Called by the renderer once per frame. */
-  frame(perfMs: number, out: MusicFrame = this.frameOut): MusicFrame {
-    if (this.frozenPos !== null) {
-      // Advance the score far enough to cover the frozen position, then read it.
-      const T = this.seq.tempo.timeAt(this.frozenPos);
-      if (this.seq.horizonTime < T + LOOKAHEAD) this.seq.advance(T + LOOKAHEAD, noop);
-      fillFrame(this.seq, T, out);
-      out.audible = false;
-      return out;
-    }
+  get current(): SoundRequest | null {
+    return this.schedule.current;
+  }
+
+  // ── Frame ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  /** Called by the renderer once per frame (or by any page that draws in sync). */
+  frame(perfMs: number, out: ChirpFrame = this.frameOut): ChirpFrame {
     const T = this.now(perfMs);
     this.lastT = T;
-    if (this.mode === 'silent' && this.pausedAt === null) this.seq.advance(T + LOOKAHEAD, this.silentEmit);
-    fillFrame(this.seq, T, out);
+    if (this.mode === 'silent' && this.pausedAt === null) this.schedule.advance(T + LOOKAHEAD, noop);
+    this.schedule.at(T, out);
     out.audible = this.mode === 'audio' && this.ctx?.state === 'running';
-    if (this.log && out.running) {
-      const age: number[] = [];
-      for (let i = 0; i < out.layers; i++) age.push(out.onsetAge[i]!);
-      this.log.frames.push({ perf: perfMs, T, age });
+    if (this.log) {
+      const ear = this.mode === 'audio' && this.clock ? this.clock.raw(perfMs) : null;
+      this.log.frames.push({ perf: perfMs, T, clip: out.clip, playing: out.playing, t: out.t, pos: out.pos, ear, offA: this.offA });
       if (this.log.frames.length > 20000) this.log.frames.splice(0, 10000);
     }
     return out;
   }
 
-  private readonly silentEmit = (time: number, layer: number) => {
-    if (this.log) this.log.onsets.push({ T: time, layer });
-  };
+  // ── Audio scheduling ───────────────────────────────────────────────────────────────────────────────────────────
 
   private tick = () => {
     const ctx = this.ctx;
-    if (this.mode !== 'audio' || !ctx || ctx.state !== 'running' || this.frozenPos !== null) return;
+    if (this.mode !== 'audio' || !ctx || ctx.state !== 'running' || this.pausedAt !== null) return;
+    const H = ctx.currentTime + LOOKAHEAD + this.offA;
+    this.schedule.advance(H, this.emit);
+    for (const inst of this.pending) this.tryStart(inst);
     const perf = performance.now();
-    const statuses = $sceneStatus.get();
-    if (Object.values(statuses).includes('loading')) this.busyUntil = perf + 2000;
-    const la = perf < this.busyUntil ? LOOKAHEAD_BUSY : LOOKAHEAD;
-    const H = ctx.currentTime + la + this.offA;
-    this.seq.advance(H, this.emit);
-    this.stream?.flush();
-    this.syncEnvelopes(H);
     if (perf - this.audibleAt > 100) {
       this.audibleAt = perf;
-      const t = this.seq.current;
+      const f = this.frameOut;
       const a = $audible.get();
-      const key = t.section?.key ?? null;
-      if (a.key !== key || Math.abs(a.rate - t.rate) / Math.max(1e-6, a.rate) > 0.01 || a.running !== !!t.section)
-        $audible.set({ running: !!t.section, rate: t.rate, key });
+      if (a.clip !== f.clip || a.playing !== f.playing) $audible.set({ clip: f.clip, playing: f.playing });
     }
   };
 
-  private readonly emit = (time: number, layer: number, step: number, accent: number, _together: number, entry: Entry) => {
-    const ctx = this.ctx!;
-    const g = this.graph!;
-    const when = time - this.offA;
-    if (entry !== this.lastEntry) this.onEntry(entry);
-    if (this.log) this.log.onsets.push({ T: time, layer });
-    const engine: Engine = this.seq.engines.get(entry) ?? 'hits';
-    const c = entry.c!;
-    const spec = c.section.layers[layer]!;
-    if (when < ctx.currentTime + 0.002 || !this.bank) {
-      this.late++;
-      if (this.log) this.log.late++;
+  private readonly emit = (inst: Instance) => {
+    void this.load(inst.clip.id);
+    this.pending.add(inst);
+    this.tryStart(inst);
+  };
+
+  private tryStart(inst: Instance): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const buf = this.buffers.get(inst.clip.id);
+    const nowCtx = ctx.currentTime;
+    const startCtx = inst.start - this.offA;
+    const endCtx = inst.end - this.offA;
+    if (endCtx <= nowCtx + 0.03) {
+      // Too late to be worth starting (or cut meanwhile).
+      this.pending.delete(inst);
+      if (!buf) this.late++;
       return;
     }
-    const rate = spec.pitch ? Math.pow(2, spec.pitch / 12) : 1;
-    if (engine === 'stream') {
-      // Overlapping periodic hits add up coherently: tame the level as the hit rate climbs into the audio range.
-      const hz = (this.seq.tempo.rateAt(time) * c.G) / c.tickStep[layer]!;
-      if (this.stream) {
-        this.stream.push(when, layer, spec.voice, accent, this.rr++, rate, Math.min(1, Math.pow(8 / hz, 0.8)));
-        return;
-      }
-      // No AudioWorklet: scheduled nodes cope up to a few dozen hits a second per layer; above that, thin them out.
-      if (hz > 60 && this.rr++ % Math.ceil(hz / 60) !== 0) return;
+    if (!buf) return; // still loading: retried on the next tick
+    this.pending.delete(inst);
+    let when = startCtx;
+    let offset = 0;
+    if (when < nowCtx + 0.005) {
+      // Late (buffer arrived after the start): join part-way so the sound still matches the picture.
+      offset = (nowCtx + 0.02 - startCtx) * 1; // audio seconds into the clip
+      when = nowCtx + 0.02;
+      this.late++;
+      if (this.log) this.log.late++;
     }
     const src = ctx.createBufferSource();
-    src.buffer = this.bank.get(spec.voice, accent, this.rr++);
-    if (rate !== 1) src.playbackRate.value = rate;
-    // Sound follows the picture: a hit sits in the stereo field where its step sits on the layer's ring.
-    const spread = this.seq.current.spread ?? 0.45;
-    const steps = c.steps[layer]!;
-    const pan = Math.max(-1, Math.min(1, spec.pan + (steps > 1 ? spread * Math.sin((2 * Math.PI * step) / steps) : 0)));
-    if (Math.abs(pan) > 1e-3) {
-      const p = ctx.createStereoPanner();
-      p.pan.value = pan;
-      src.connect(p).connect(g.scale[layer]!);
-    } else src.connect(g.scale[layer]!);
-    src.start(when);
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = this.gains.get(inst.clip.id) ?? 1;
+    src.connect(g).connect(master);
+    const dur = Math.max(0, endCtx - when);
+    src.start(when, offset, dur);
+    const p: Playing = { src, gain: g };
+    this.playing.set(inst, p);
+    src.onended = () => {
+      src.disconnect();
+      g.disconnect();
+      this.playing.delete(inst);
+    };
+    if (this.log) this.log.starts.push({ clip: inst.clip.id, T: inst.start, end: inst.end, ctxStart: when, offset });
+  }
+
+  private readonly cancel = (inst: Instance, at: number) => {
+    this.pending.delete(inst);
+    const p = this.playing.get(inst);
+    const ctx = this.ctx;
+    if (!p || !ctx) return;
+    const atCtx = Math.max(ctx.currentTime, at - this.offA);
+    p.gain.gain.setTargetAtTime(0, atCtx, CUT_FADE / 3);
+    try {
+      p.src.stop(atCtx + CUT_FADE);
+    } catch {
+      /* already stopped */
+    }
   };
 
-  /** A new score entry starts: set each layer bus's level and pan at its start time. */
-  private onEntry(e: Entry): void {
-    this.lastEntry = e;
-    const g = this.graph!;
-    const at = Math.max(this.ctx!.currentTime, this.seq.tempo.timeAt(e.atPos) - this.offA);
-    const layers = e.c?.section.layers ?? [];
-    const stream = (this.seq.engines.get(e) ?? 'hits') === 'stream' && !!this.stream;
-    for (let i = 0; i < MAX_LAYERS; i++) {
-      const spec = layers[i];
-      g.scale[i]!.gain.setValueAtTime(spec ? spec.gain : 0, at);
-      // Scheduled hits carry their own pan; the worklet's mono outputs are panned per layer here.
-      g.pan[i]!.pan.setValueAtTime(spec && stream ? spec.pan : 0, at);
-    }
-  }
-
-  private roomLevel = -1;
-
-  private syncEnvelopes(H: number): void {
-    const g = this.graph!;
-    const room = this.seq.current.room ?? 0.16;
-    if (room !== this.roomLevel) {
-      this.roomLevel = room;
-      g.roomSend.gain.setTargetAtTime(room, Math.max(this.ctx!.currentTime, H - this.offA), 0.15);
-    }
-    for (let i = 0; i < MAX_LAYERS; i++) {
-      const v = this.seq.gains.targetOf(i);
-      if (v === this.envTarget[i]) continue;
-      this.envTarget[i] = v;
-      g.env[i]!.gain.setTargetAtTime(v, Math.max(this.ctx!.currentTime, H - this.offA), 0.08 / 3);
-    }
-  }
+  // ── Sound on / off ─────────────────────────────────────────────────────────────────────────────────────────────
 
   /** Must be called from inside a user gesture handler. */
   enableSound(): void {
@@ -226,26 +274,27 @@ class Transport {
     }
     $sound.set('starting');
     storeSoundOn(true);
-    if (!this.graph) this.build(ctx);
-    void Promise.all([loadBank(), ctx.state === 'running' ? Promise.resolve() : ctx.resume()]).then(async ([bank]) => {
-      this.bank = bank;
-      this.stream ??= await createStream(ctx, bank, this.graph!.scale).catch((err) => {
-        console.warn('[audio] stream engine unavailable; using scheduled hits', err);
-        return null;
-      });
+    if (!this.master) this.build(ctx);
+    const req = this.schedule.current;
+    const first = req ? this.load(req.clip) : Promise.resolve(null);
+    // The story's clips are small (≈ 64 KB each): fetch them all now so no chirp ever starts late.
+    for (const [id, src] of this.sources) if (src.kind === 'url') void this.load(id);
+    void Promise.all([first, ctx.state === 'running' ? Promise.resolve() : ctx.resume()]).then(() => {
       if (ctx.state !== 'running') {
         $sound.set('blocked');
         return;
       }
       this.switchTo('audio');
-      this.graph!.master.gain.setTargetAtTime(1, ctx.currentTime, 0.03);
+      this.master!.gain.setTargetAtTime(1, ctx.currentTime, 0.03);
       $sound.set('on');
     });
   }
 
   disableSound(): void {
     storeSoundOn(false);
-    if (this.ctx && this.graph) this.graph.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+    if (this.ctx && this.master) this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+    // Nodes already started keep running silently and end by themselves; the schedule (and the picture) runs on.
+    this.pending.clear();
     this.switchTo('silent');
     $sound.set('off');
   }
@@ -263,26 +312,7 @@ class Transport {
     limiter.attack.value = 0.001;
     limiter.release.value = 0.08;
     master.connect(limiter).connect(ctx.destination);
-    // A small stereo room: decorrelated decaying noise in each ear, sent from the mix and limited with it.
-    const roomSend = ctx.createGain();
-    roomSend.gain.value = 0;
-    const room = ctx.createConvolver();
-    room.normalize = true;
-    room.buffer = roomImpulse(ctx);
-    master.connect(roomSend).connect(room).connect(limiter);
-    const scale: GainNode[] = [];
-    const env: GainNode[] = [];
-    const pan: StereoPannerNode[] = [];
-    for (let i = 0; i < MAX_LAYERS; i++) {
-      const s = ctx.createGain();
-      const e = ctx.createGain();
-      const p = ctx.createStereoPanner();
-      s.connect(e).connect(p).connect(master);
-      scale.push(s);
-      env.push(e);
-      pan.push(p);
-    }
-    this.graph = { master, limiter, roomSend, scale, env, pan };
+    this.master = master;
     ctx.addEventListener('statechange', () => {
       if (ctx.state === 'running') this.clock?.snap();
       if (this.mode === 'audio' && (ctx.state as string) === 'interrupted') $sound.set('blocked');
@@ -304,8 +334,8 @@ class Transport {
     if (mode === 'audio') {
       this.clock!.snap();
       this.offA = T - this.clock!.now(perf);
-      this.lastEntry = null;
-      this.envTarget.fill(-1);
+      // Instances already under way (scheduled while silent) join part-way.
+      for (const inst of this.schedule.instances) if (inst.end > T && !this.playing.has(inst)) this.emit(inst);
     } else this.offS = T - perf / 1000;
   }
 
@@ -313,25 +343,26 @@ class Transport {
     const hidden = document.hidden;
     const ctx = audioContext();
     if (hidden) {
-      const perf = performance.now();
-      this.pausedAt = this.now(perf);
-      if (this.mode === 'audio' && ctx && this.graph) {
-        this.graph.master.gain.setTargetAtTime(0, ctx.currentTime, 0.01);
+      this.pausedAt = this.now(performance.now());
+      if (this.mode === 'audio' && ctx && this.master) {
+        this.master.gain.setTargetAtTime(0, ctx.currentTime, 0.01);
         setTimeout(() => {
           if (document.hidden) void ctx.suspend();
         }, 60);
         pauseShim(true);
       }
+      // A clip cut by hiding the tab is cut in the schedule too, so picture and sound agree on return.
+      this.schedule.cut(this.pausedAt, this.cancel, true);
       return;
     }
     const T = this.pausedAt ?? this.lastT;
     this.pausedAt = null;
-    if (this.mode === 'audio' && ctx && this.graph) {
+    if (this.mode === 'audio' && ctx && this.master) {
       pauseShim(false);
       void ctx.resume().then(() => {
         this.clock!.snap();
         this.offA = T - this.clock!.now(performance.now());
-        this.graph!.master.gain.setTargetAtTime(1, ctx.currentTime, 0.03);
+        this.master!.gain.setTargetAtTime(1, ctx.currentTime, 0.03);
       });
       setTimeout(() => {
         if (ctx.state !== 'running' && this.mode === 'audio') $sound.set('blocked');
@@ -339,40 +370,16 @@ class Transport {
     } else this.offS = T - performance.now() / 1000;
   }
 
-  /** Context and graph for diagnostics (dev/sync). */
+  /** Context and graph for diagnostics (dev pages, audio-check). */
   diagnostics() {
     const c = this.ctx;
     return c
-      ? { state: c.state, sampleRate: c.sampleRate, baseLatency: c.baseLatency, outputLatency: c.outputLatency ?? 0, late: this.late, mode: this.mode, stream: !!this.stream }
-      : { state: 'none', mode: this.mode, late: this.late };
+      ? { state: c.state, sampleRate: c.sampleRate, baseLatency: c.baseLatency, outputLatency: c.outputLatency ?? 0, late: this.late, mode: this.mode, offA: this.offA, buffers: [...this.buffers.keys()] }
+      : { state: 'none', mode: this.mode, late: this.late, offA: 0, buffers: [] as string[] };
   }
 }
 
 const noop = () => {};
 
-/** 1.4 s stereo impulse: 11 ms pre-delay, exponential decay, gently darkened, different noise in each ear. */
-function roomImpulse(ctx: BaseAudioContext): AudioBuffer {
-  const sr = ctx.sampleRate;
-  const len = Math.ceil(1.4 * sr);
-  const b = ctx.createBuffer(2, len, sr);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = b.getChannelData(ch);
-    let seed = ch ? 0x9e3779b9 : 0x85ebca6b;
-    let lp = 0;
-    const pre = Math.round(0.011 * sr);
-    for (let i = pre; i < len; i++) {
-      seed ^= seed << 13;
-      seed ^= seed >>> 17;
-      seed ^= seed << 5;
-      const n = ((seed >>> 0) / 4294967296) * 2 - 1;
-      const t = (i - pre) / sr;
-      const k = 0.35 + 0.5 * Math.min(1, t / 0.8);
-      lp += (n - lp) * (1 - k);
-      d[i] = lp * Math.exp(-t / 0.32);
-    }
-  }
-  return b;
-}
-
 export const transport = new Transport();
-export { SILENCE };
+export type { ChirpFrame, ClipInfo, SoundRequest };

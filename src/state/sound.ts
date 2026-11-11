@@ -7,18 +7,15 @@ export type SoundState = 'off' | 'armed' | 'starting' | 'on' | 'blocked';
 
 export const $sound = atom<SoundState>('off');
 
-/** What the listener hears now, for live readouts: ratio name, steps per second, etc. Throttled by the transport. */
+/** What the listener hears now, for live readouts (which clip, playing or not). Throttled by the transport. */
 export interface Audible {
-  running: boolean;
-  /** Master cycles per second. */
-  rate: number;
-  /** Key of the section playing. */
-  key: string | null;
+  clip: string | null;
+  playing: boolean;
 }
-export const $audible = atom<Audible>({ running: false, rate: 0, key: null });
+export const $audible = atom<Audible>({ clip: null, playing: false });
 
-const KEY = 'cross-rhythm:sound';
-const OFFSET_KEY = 'cross-rhythm:sync-ms';
+const KEY = 'gravitational-waves:sound';
+const OFFSET_KEY = 'gravitational-waves:sync-ms';
 
 export function storedSoundOn(): boolean {
   try {

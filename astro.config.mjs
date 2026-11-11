@@ -4,7 +4,7 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 
-// Dev-only routes (HANDOFF §15): the scene smoke test is not shipped.
+// Dev-only routes: the scene smoke test and the listening bench are not shipped.
 /** @type {import('astro').AstroIntegration} */
 const devRoutes = {
   name: 'dev-routes',
@@ -12,6 +12,7 @@ const devRoutes = {
     'astro:config:setup': ({ command, injectRoute }) => {
       if (command !== 'dev') return;
       injectRoute({ pattern: '/dev/scenes', entrypoint: './src/dev/scenes.astro' });
+      injectRoute({ pattern: '/dev/listen', entrypoint: './src/dev/listen.astro' });
     },
   },
 };

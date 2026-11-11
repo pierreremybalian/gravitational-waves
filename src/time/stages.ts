@@ -1,10 +1,12 @@
-// Stage table and the scroll ↔ stage mapping (HANDOFF §7). Scroll is the argument, not the clock: each stage owns a
+// Stage table (HANDOFF "Story") and the scroll ↔ stage mapping. Scroll is the argument, not the clock: each stage owns a
 // scroll span (scrollWeight) and its scene reads `local` ∈ [0, 1] through its own script (src/script/).
 
 import { clamp } from '../physics/interp.ts';
 
 export type TransitionKind = 'dissolve' | 'zoom' | 'stretch';
-export type Status = 'exact' | 'measured' | 'convention' | 'tradition' | 'historical' | 'metaphor';
+/** How sure: measured (GWOSC data / published analysis), established (tested physics), modelled (a fitted model),
+ * metaphor (a picture, nothing literal). */
+export type Status = 'measured' | 'established' | 'modelled' | 'metaphor';
 
 export interface Stage {
   id: string;
@@ -21,19 +23,19 @@ const DEFAULT_SPAN = 0.12;
 type Row = [id: string, status: Status, weight: number, transition: TransitionKind];
 
 const ROWS: Row[] = [
-  ['two', 'exact', 6, 'dissolve'],
-  ['cycle', 'measured', 6, 'dissolve'],
-  ['grouping', 'measured', 6, 'dissolve'],
-  ['axle', 'exact', 8, 'dissolve'],
-  ['knot', 'exact', 7, 'dissolve'],
-  ['harmony', 'measured', 8, 'dissolve'],
-  ['rhythmicon', 'historical', 6, 'dissolve'],
-  ['gears', 'exact', 7, 'dissolve'],
-  ['long', 'exact', 6, 'dissolve'],
-  ['six', 'measured', 6, 'dissolve'],
-  ['even', 'exact', 7, 'dissolve'],
-  ['ensemble', 'tradition', 7, 'dissolve'],
-  ['studio', 'exact', 6, 'dissolve'],
+  ['sound', 'measured', 6, 'dissolve'], // 1 A sound from space
+  ['fabric', 'established', 6, 'dissolve'], // 2 Spacetime is a fabric
+  ['ripples', 'established', 6, 'dissolve'], // 3 Ripples (+ and × on a ring of particles)
+  ['binary', 'modelled', 6, 'dissolve'], // 4 Two black holes
+  ['inspiral', 'measured', 7, 'dissolve'], // 5 The inspiral (the chirp)
+  ['merger', 'modelled', 6, 'dissolve'], // 6 Merger and ringdown
+  ['scale', 'measured', 6, 'dissolve'], // 7 How small
+  ['interferometer', 'established', 7, 'dissolve'], // 8 An interferometer
+  ['noise', 'measured', 6, 'dissolve'], // 9 Noise
+  ['finding', 'measured', 7, 'dissolve'], // 10 Finding it (whitening, matched filter)
+  ['detectors', 'measured', 6, 'dissolve'], // 11 Two detectors
+  ['results', 'measured', 6, 'dissolve'], // 12 What it told us
+  ['catalogue', 'measured', 8, 'dissolve'], // 13 The catalogue (finale)
 ];
 
 export const STAGES: readonly Stage[] = ROWS.map(([id, status, scrollWeight, transitionIn]) => ({

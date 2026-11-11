@@ -86,8 +86,8 @@ export async function createEngine(opts: EngineOptions): Promise<Engine | null> 
   };
   applySize();
 
-  const music = transport.frameOut;
-  const ctx: RenderContext = { renderer, globals, quality, assets, music };
+  const chirp = transport.frameOut;
+  const ctx: RenderContext = { renderer, globals, quality, assets, chirp };
   compositor = new Compositor(renderer, globals);
   manager = new SceneManager(ctx);
   applySize();
@@ -160,11 +160,11 @@ export async function createEngine(opts: EngineOptions): Promise<Engine | null> 
     lastNow = now;
     const dt = dtMs / 1000;
     const nowS = now / 1000;
-    transport.frame(now, music);
-    globals.updateMusic(music);
-    // Reduced motion holds one still per stage, unless sound is on: then the music's indicators keep moving
-    // (colour and opacity only; scenes check ctx.music.audible together with $reducedMotion).
-    const reduced = $reducedMotion.get() && !music.audible;
+    transport.frame(now, chirp);
+    globals.updateChirp(chirp);
+    // Reduced motion holds one still per stage, unless sound is on: then the chirp's indicators keep moving
+    // (colour and opacity only; scenes check ctx.chirp.audible together with $reducedMotion).
+    const reduced = $reducedMotion.get() && !chirp.audible;
     if (!$reducedMotion.get()) elapsed += dt;
     frames++;
     labels?.begin();
@@ -199,7 +199,7 @@ export async function createEngine(opts: EngineOptions): Promise<Engine | null> 
         // One still per stage at local = 0.5, held; transitions are plain crossfades.
         for (const e of [incoming, outgoing]) {
           if (!e?.scene) continue;
-          const key = `${e.id}:${e.target.width}x${e.target.height}:${e.scene.revision?.() ?? 0}:${music.revision}`;
+          const key = `${e.id}:${e.target.width}x${e.target.height}:${e.scene.revision?.() ?? 0}:${chirp.revision}`;
           if (e.heldKey === key) continue;
           globals.update(0.5, 0);
           e.scene.update(0.5, 0, 0);

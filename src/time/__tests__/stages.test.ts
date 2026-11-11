@@ -9,6 +9,25 @@ describe('stages', () => {
     for (let i = 1; i < STAGE_STARTS.length; i++) expect(STAGE_STARTS[i]!).toBeGreaterThan(STAGE_STARTS[i - 1]!);
     expect(STAGE_STARTS.at(-1)).toBe(1);
   });
+  it('follows the HANDOFF story order with honest statuses', () => {
+    expect(STAGES.map((s) => s.id)).toEqual([
+      'sound',
+      'fabric',
+      'ripples',
+      'binary',
+      'inspiral',
+      'merger',
+      'scale',
+      'interferometer',
+      'noise',
+      'finding',
+      'detectors',
+      'results',
+      'catalogue',
+    ]);
+    const st = Object.fromEntries(STAGES.map((s) => [s.id, s.status]));
+    expect(st).toMatchObject({ sound: 'measured', fabric: 'established', ripples: 'established', binary: 'modelled', merger: 'modelled', interferometer: 'established' });
+  });
   it('progress ↔ stage round-trips', () => {
     for (let k = 0; k <= 1000; k++) {
       const p = k / 1000;

@@ -1,5 +1,5 @@
 // Shared colours (linear RGB, HDR-friendly). Mirrored as CSS tokens in src/styles/global.css.
-// Layers are coloured in order: amber, cyan, rose, lime, violet, gold (then repeat, dimmer). White = together.
+// Detectors keep one colour everywhere: Hanford amber, Livingston cyan, Virgo violet, KAGRA lime. White = both/network.
 
 export type RGB = readonly [number, number, number];
 
@@ -20,21 +20,15 @@ export const PAL = {
   red: [1.0, 0.3, 0.26] as RGB,
 } as const;
 
-/** Layer colours in display order (sRGB-ish values used as linear HDR; CSS --color-l0…l5). */
-export const LAYER: readonly RGB[] = [
-  [1.0, 0.62, 0.22],
-  [0.22, 0.78, 1.0],
-  [1.0, 0.36, 0.64],
-  [0.64, 0.96, 0.3],
-  [0.62, 0.52, 1.0],
-  [1.0, 0.86, 0.42],
-];
-
-export const layerColour = (i: number): RGB => {
-  const c = LAYER[i % LAYER.length]!;
-  const k = i < LAYER.length ? 1 : 0.7;
-  return [c[0] * k, c[1] * k, c[2] * k];
+/** Detector colours (CSS --color-h1, --color-l1, --color-v1, --color-k1). */
+export const DET: Readonly<Record<string, RGB>> = {
+  H1: [1.0, 0.62, 0.22],
+  L1: [0.22, 0.78, 1.0],
+  V1: [0.62, 0.52, 1.0],
+  K1: [0.64, 0.96, 0.3],
 };
+
+export const detColour = (d: string): RGB => DET[d] ?? PAL.both;
 
 /** Hex for CSS/HTML use. */
 export function hex(c: RGB): string {
