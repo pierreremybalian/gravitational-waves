@@ -59,3 +59,8 @@ Chirp audio (16384 Hz, 16-bit WAV, 2.000 s, t ∈ [−1.5, +0.5] s, 80 ms fades,
 ### Not done in this phase
 - `src/gw/filter.ts` (reference whitening / matched filter for small arrays, HANDOFF Physics core) is not written yet; the heavy processing lives in the Python scripts.
 - Sky map (GWOSC FITS → band) for stage 11 not fetched yet.
+
+## Stages 1–7 (2026-11-10)
+- Stages 4–6 play the best-fit model slowed with its pitch kept, built in the browser from the template's frequency/phase/amplitude tracks: 4 = −1.5…−0.6 s ×10 slower, pitch ×8; 5 = −0.6…+0.03 s ×12, pitch ×4; 6 = −35…+30 ms ×60, pitch ×4. Clips are registered on the transport at their slow rate, so `ctx.chirp.t` is data time and orbit, waves and sound share one clock. Stated in each stage note.
+- Stage 4 draws the outgoing waves at a quarter of light speed so the spiral fits the view (stated).
+- Masses are source-frame from events.json (34.6 + 30.0 → 61.5 M☉, 3.1 M☉ radiated); stage 1/5 readouts that quote detector-frame values say so.
