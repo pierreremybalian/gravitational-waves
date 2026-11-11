@@ -6,6 +6,7 @@ import Narration, { type NarrationCaption } from '../story/Narration.astro';
 import Hud from '../hud/Hud.astro';
 import SoundToggle from '../audio/SoundToggle.astro';
 import HireMe from '../components/HireMe.astro';
+import Finale from '../finale/ui/Finale.astro';
 import { STAGES as CHAPTERS, STAGE_STARTS as CHAPTER_STARTS } from '../time/stages.ts';
 import { VH_PER_WEIGHT } from '../scroll/driver.ts';
 import { HERO_END, MIN_DWELL_SVH, captionSchedule } from '../story/schedule.ts';
@@ -62,6 +63,7 @@ const titles = chapters.map((ch) => ch.data.title);
   <Hud />
   <SoundToggle />
   <HireMe />
+  <Finale />
 
   <header class="hero" data-hero>
     <p class="hero-kicker">

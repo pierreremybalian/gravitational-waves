@@ -1,0 +1,423 @@
+---
+// The catalogue finale's interactive layer (stage 13, HANDOFF "Finale"): the pointer and keyboard surface over the
+// 3D catalogue, and the panel (view, filters, quick picks, search, the selected event's card with its sound). Unlike
+// the HUD it is a real tool, not aria-hidden; inert until the reader reaches it (src/finale/ui/panel.ts).
+---
+
+<div class="finale" data-finale inert>
+  <div
+    class="layer"
+    data-layer
+    data-own-keys
+    tabindex="0"
+    role="application"
+    aria-roledescription="catalogue"
+    aria-label="Catalogue of gravitational-wave events. Left and right arrows: previous and next event. Up and down: tilt the view. Drag to turn it; click a bead to choose its event."
+  >
+  </div>
+
+  <section class="panel" data-panel aria-labelledby="fin-h">
+    <div class="scroller" data-scroller data-lenis-prevent>
+      <header class="head">
+        <h2 id="fin-h">Every merger so far</h2>
+        <p class="count" data-count></p>
+      </header>
+
+      <div class="row" role="group" aria-label="Arrangement">
+        <button type="button" class="seg" data-view="time" aria-pressed="true">By date</button>
+        <button type="button" class="seg" data-view="distance" aria-pressed="false">Mass vs distance</button>
+      </div>
+
+      <div class="filters" role="group" aria-label="Show these kinds">
+        <button type="button" class="chip" data-filter="BBH" aria-pressed="true"><i data-k="BBH"></i>Two black holes <b data-n="BBH"></b></button>
+        <button type="button" class="chip" data-filter="NSBH" aria-pressed="true"><i data-k="NSBH"></i>Neutron star + black hole <b data-n="NSBH"></b></button>
+        <button type="button" class="chip" data-filter="BNS" aria-pressed="true"><i data-k="BNS"></i>Two neutron stars <b data-n="BNS"></b></button>
+        <button type="button" class="chip" data-filter="candidate" aria-pressed="true"><i data-k="candidate"></i>No parameters yet <b data-n="candidate"></b></button>
+      </div>
+
+      <div class="picks" role="group" aria-label="Go to">
+        <button type="button" class="pick" data-pick="first">The first</button>
+        <button type="button" class="pick" data-pick="loudest">The loudest</button>
+        <button type="button" class="pick" data-pick="heaviest">The heaviest</button>
+        <button type="button" class="pick" data-pick="bns">GW170817</button>
+      </div>
+
+      <div class="find">
+        <label for="fin-q">Find an event by name</label>
+        <div class="find-row">
+          <input id="fin-q" type="search" list="fin-names" placeholder="GW190521" autocomplete="off" spellcheck="false" data-q data-own-keys />
+          <button type="button" class="step" data-prev aria-label="Previous event">‹</button>
+          <button type="button" class="step" data-next aria-label="Next event">›</button>
+        </div>
+        <datalist id="fin-names" data-names></datalist>
+      </div>
+
+      <article class="card" data-card hidden aria-labelledby="fin-name">
+        <header>
+          <h3 id="fin-name" data-name></h3>
+          <span class="kind" data-kind></span>
+        </header>
+        <p class="when" data-when></p>
+        <dl class="facts" data-facts></dl>
+        <p class="dets" data-dets></p>
+        <div class="play" role="group" aria-label="Listen">
+          <div class="play-data" data-play-data></div>
+          <button type="button" class="model" data-play-model>Model chirp <span>modelled</span></button>
+          <button type="button" class="stop" data-stop>Stop</button>
+        </div>
+        <p class="sound-hint" data-sound-hint hidden><button type="button" data-sound-on>Turn sound on</button> to hear it.</p>
+        <p class="note" data-note></p>
+        <p class="src"><a data-link rel="noopener" target="_blank">GWOSC event page</a></p>
+      </article>
+      <p class="sr-only" aria-live="polite" data-sr></p>
+    </div>
+  </section>
+</div>
+
+<script>
+  import { initFinale } from './panel.ts';
+  initFinale(document.querySelector<HTMLElement>('[data-finale]')!);
+</script>
+
+<style>
+  .finale {
+    position: fixed;
+    inset: 0;
+    z-index: 16;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.6s var(--ease-cosmic),
+      visibility 0s linear 0.6s;
+  }
+  :global(html.finale-on) .finale {
+    opacity: calc(1 - var(--end-fade, 0));
+    visibility: visible;
+    transition: opacity 0.6s var(--ease-cosmic);
+  }
+  :global(html.past-end) .finale {
+    visibility: hidden;
+  }
+  :global(html.finale-on.finale-engaged .narration .caps) {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: pan-y;
+    outline: none;
+  }
+  .layer.pointing {
+    cursor: pointer;
+  }
+  .layer:focus-visible {
+    box-shadow: inset 0 0 0 2px rgb(255 217 160 / 0.45);
+  }
+  button,
+  input {
+    font: inherit;
+    color: inherit;
+  }
+  .panel {
+    position: absolute;
+    pointer-events: auto;
+    right: max(0.75rem, env(safe-area-inset-right));
+    top: 1rem;
+    bottom: 5.4rem;
+    width: min(22rem, calc(100vw - 1.5rem));
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .scroller {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 0.9rem;
+    border: 1px solid var(--color-line);
+    background: rgb(6 8 16 / 0.8);
+    backdrop-filter: blur(12px);
+    scrollbar-width: thin;
+  }
+  .head h2 {
+    font-family: var(--font-serif);
+    font-weight: 350;
+    font-size: 1.45rem;
+    line-height: 1.1;
+    color: var(--color-paper);
+  }
+  .count {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--color-mute);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.2rem;
+    border-radius: 0.6rem;
+    background: rgb(255 255 255 / 0.04);
+  }
+  .seg {
+    padding: 0.45rem 0.5rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+    cursor: pointer;
+  }
+  .seg[aria-pressed='true'] {
+    background: rgb(255 217 160 / 0.14);
+    color: var(--color-glow);
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.32rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line-strong);
+    background: transparent;
+    font-size: 0.76rem;
+    color: var(--color-fog);
+    cursor: pointer;
+  }
+  .chip b {
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--color-mute);
+  }
+  .chip[aria-pressed='false'] {
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
+  .chip i,
+  .kind i {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  i[data-k='BBH'] {
+    background: #ffbd75;
+    box-shadow: 0 0 8px #ffbd75;
+  }
+  i[data-k='NSBH'] {
+    background: #6bffb8;
+    box-shadow: 0 0 8px #6bffb8;
+  }
+  i[data-k='BNS'] {
+    background: #b78fff;
+    box-shadow: 0 0 8px #b78fff;
+  }
+  i[data-k='candidate'] {
+    border: 1.5px solid #8a92b2;
+  }
+  .picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .pick,
+  .step,
+  .play :global(button),
+  .sound-hint button {
+    padding: 0.38rem 0.7rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: rgb(255 255 255 / 0.03);
+    font-size: 0.78rem;
+    color: var(--color-paper);
+    cursor: pointer;
+  }
+  .pick:hover,
+  .step:hover,
+  .play :global(button:hover),
+  .chip:hover,
+  .seg:hover {
+    border-color: rgb(255 217 160 / 0.6);
+  }
+  :global(.finale button:focus-visible),
+  input:focus-visible {
+    outline: 2px solid var(--color-glow);
+    outline-offset: 2px;
+  }
+  .find label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+    margin-bottom: 0.3rem;
+  }
+  .find-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.3rem;
+  }
+  .find input {
+    min-width: 0;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: rgb(6 8 16 / 0.7);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--color-paper);
+  }
+  .step {
+    width: 2.2rem;
+    padding: 0.3rem;
+    font-size: 1rem;
+  }
+  .card {
+    display: grid;
+    gap: 0.55rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--color-line);
+  }
+  .card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .card h3 {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--color-glow);
+  }
+  .kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.74rem;
+    color: var(--color-fog);
+  }
+  .when {
+    font-size: 0.8rem;
+    color: var(--color-mute);
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.28rem 0.8rem;
+    font-size: 0.84rem;
+  }
+  .facts :global(dt) {
+    color: var(--color-mute);
+  }
+  .facts :global(dd) {
+    color: var(--color-paper);
+    font-variant-numeric: tabular-nums;
+  }
+  .facts :global(dd small) {
+    color: var(--color-mute);
+    font-size: 0.72rem;
+  }
+  .dets {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    font-size: 0.74rem;
+  }
+  .dets :global(span) {
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.35rem;
+    border: 1px solid currentColor;
+    font-family: var(--font-mono);
+  }
+  .play {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .play-data {
+    display: contents;
+  }
+  .play :global(.nodata) {
+    font-size: 0.78rem;
+    color: var(--color-mute);
+  }
+  .play :global(button[aria-pressed='true']) {
+    border-color: var(--color-glow);
+    background: rgb(255 217 160 / 0.12);
+  }
+  .play .model span {
+    margin-left: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-st-modelled);
+  }
+  .play .stop {
+    color: var(--color-mute);
+  }
+  .sound-hint {
+    font-size: 0.78rem;
+    color: var(--color-mute);
+  }
+  .note {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--color-fog);
+  }
+  .src {
+    font-size: 0.76rem;
+  }
+  .src a {
+    color: var(--color-signal);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  @media (max-width: 767px) {
+    .panel {
+      left: 0.6rem;
+      right: 0.6rem;
+      width: auto;
+      top: auto;
+      bottom: 4.6rem;
+      max-height: 46svh;
+    }
+    .scroller {
+      padding: 0.8rem;
+      gap: 0.6rem;
+    }
+    .head h2 {
+      font-size: 1.2rem;
+    }
+  }
+</style>

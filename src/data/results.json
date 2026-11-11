@@ -1,0 +1,157 @@
+{
+  "GW150914": {
+    "name": "GW150914",
+    "version": 4,
+    "catalog": "GWTC-2.1-confident",
+    "gps": 1126259462.4,
+    "utc": "2015-09-14T09:50:45.4Z",
+    "type": "BBH",
+    "typeAmbiguous": false,
+    "m1": [
+      34.6,
+      32,
+      39
+    ],
+    "m2": [
+      30,
+      25.4,
+      32.9
+    ],
+    "mTotal": [
+      64.5,
+      61.3,
+      68.2
+    ],
+    "mChirp": [
+      27.9,
+      26.4,
+      29.6
+    ],
+    "mFinal": [
+      61.5,
+      58.6,
+      64.9
+    ],
+    "distance": [
+      470,
+      310,
+      610
+    ],
+    "redshift": [
+      0.1,
+      0.07,
+      0.13
+    ],
+    "chiEff": [
+      -0.04,
+      -0.18,
+      0.08
+    ],
+    "snr": [
+      26,
+      25.8,
+      26.1
+    ],
+    "far": null,
+    "pAstro": null,
+    "detectors": [
+      "H1",
+      "L1"
+    ],
+    "url": "https://gwosc.org/eventapi/html/GWTC-2.1-confident/GW150914/v4/",
+    "snippet": {
+      "url": "/data/events/GW150914.bin",
+      "detectors": [
+        "H1",
+        "L1"
+      ],
+      "scale": [
+        7.845,
+        6.7634
+      ],
+      "fs": 2048,
+      "n": 4096,
+      "t0": -1.75,
+      "bytes": 16384
+    }
+  },
+  "GW170817": {
+    "name": "GW170817",
+    "version": 3,
+    "catalog": "GWTC-1-confident",
+    "gps": 1187008882.4,
+    "utc": "2017-08-17T12:41:04.4Z",
+    "type": "BNS",
+    "typeAmbiguous": false,
+    "m1": [
+      1.46,
+      1.36,
+      1.58
+    ],
+    "m2": [
+      1.27,
+      1.18,
+      1.36
+    ],
+    "mTotal": null,
+    "mChirp": [
+      1.186,
+      1.185,
+      1.187
+    ],
+    "mFinal": 2.8,
+    "distance": [
+      40,
+      25,
+      47
+    ],
+    "redshift": [
+      0.01,
+      0.01,
+      0.01
+    ],
+    "chiEff": [
+      0,
+      -0.01,
+      0.02
+    ],
+    "snr": 33,
+    "far": 1e-7,
+    "pAstro": 1,
+    "detectors": [
+      "G1",
+      "H1",
+      "L1",
+      "V1"
+    ],
+    "url": "https://gwosc.org/eventapi/html/GWTC-1-confident/GW170817/v3/",
+    "snippet": {
+      "url": "/data/events/GW170817.bin",
+      "detectors": [
+        "G1",
+        "H1",
+        "L1",
+        "V1"
+      ],
+      "scale": [
+        3.4056,
+        4.7691,
+        317.5635,
+        4.5824
+      ],
+      "fs": 2048,
+      "n": 8192,
+      "t0": -3.5,
+      "bytes": 65536
+    }
+  },
+  "summary": {
+    "total": 391,
+    "BBH": 273,
+    "NSBH": 7,
+    "BNS": 2,
+    "candidates": 109,
+    "first": "2015-09-14",
+    "last": "2025-01-20"
+  }
+}

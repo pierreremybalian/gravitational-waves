@@ -1,0 +1,26 @@
+{
+  "rawRmsH1": 2.548e-19,
+  "rawRmsL1": 1.084e-18,
+  "rawPeakH1": 6.687e-19,
+  "signalPeak": 1.079e-21,
+  "rawOverSignalRms": 236,
+  "rawOverSignalPeak": 620,
+  "asd": {
+    "minValue": 7.21e-24,
+    "minFreq": 160,
+    "at15": 2.598e-21,
+    "at100": 8.099e-24,
+    "at1000": 1.858e-23,
+    "mainsValue": 8.142e-22,
+    "mainsFreq": 60,
+    "violinValue": 1.069e-21,
+    "violinFreq": 501.8
+  },
+  "snr": {
+    "net": 23.85,
+    "netT": -0.000102,
+    "h1": 19.51,
+    "l1": 13.71
+  },
+  "whitePeakH1": 7.93
+}

@@ -1,0 +1,47 @@
+// Shared state of the catalogue finale (no DOM, no three): the UI (src/finale/ui) writes the view, filters and
+// selection, and the event's loaded snippet and model; the scene (src/scenes/catalogue) reads them and reports what
+// is under the pointer through `bridge`.
+
+import { atom } from 'nanostores';
+import type { CatalogEvent } from '../shared/gwdata.ts';
+import type { ModelChirp } from './model.ts';
+import type { View } from './layout.ts';
+
+export type Kind = 'BBH' | 'NSBH' | 'BNS' | 'candidate';
+
+export const kindOf = (e: CatalogEvent): Kind => e.type ?? 'candidate';
+
+export const $events = atom<CatalogEvent[]>([]);
+export const $view = atom<View>('time');
+export const $filters = atom<Record<Kind, boolean>>({ BBH: true, NSBH: true, BNS: true, candidate: true });
+
+export interface Selected {
+  name: string;
+  index: number;
+  /** Whitened snippets per detector (noise σ), loaded lazily. */
+  snippets: Record<string, Float32Array> | null;
+  /** Model chirp from the catalogue parameters (null for candidates). */
+  model: ModelChirp | null;
+}
+
+export const $selected = atom<Selected | null>(null);
+
+/** What the finale plays now (clip id and what it is), for the scene's strip and the status chip. */
+export const $playing = atom<{ clip: string; name: string; kind: 'data' | 'model'; det: string | null } | null>(null);
+
+/** The panel's footprint: the part of the viewport left for the 3D view (fractions, top-left origin). */
+export const $free = atom<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 1, h: 1 });
+
+/** The tool is live (the reader has reached it). */
+export const $toolOn = atom(false);
+
+/** Event index under the pointer (−1 = none), for the hover label. */
+export const $hover = atom(-1);
+
+/** Orbit offsets from drags and keys (radians). */
+export const $orbit = atom({ az: 0, el: 0 });
+
+/** Set by the scene: event index under a screen point (fractions, top-left), or −1. */
+export const bridge: { pick: ((fx: number, fy: number) => number) | null } = { pick: null };
+
+export const modelClipId = (name: string): string => `model:${name}`;
