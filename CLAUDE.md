@@ -8,4 +8,4 @@ Scroll-driven 3D explanation of gravitational waves and LIGO's first detection (
 - Visuals and sound are built together from the first build (owner feedback on earlier demos).
 - Scenes isolated (`src/scenes/<id>/`), share only `src/shared/`; no allocation in the frame loop; dispose everything; TSL gotchas as in SCENES.md. Text never in the canvas.
 - Every *.balian.dev demo carries the Hire Me corner link.
-- Public repo hygiene: author `Pierre Balian <967646+pierreremybalian@users.noreply.github.com>`; Cloudflare account ID only in the gitignored `.env`.
+- Public repo hygiene: author `Pierre Balian <pierre@baliandesign.com>` (the global git identity, which is the GitHub account email; never set a noreply address); Cloudflare account ID only in the gitignored `.env`.
